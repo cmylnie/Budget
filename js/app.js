@@ -830,9 +830,9 @@ function sheetCharge(c) {
   const next12 = A.monthsAhead(m, 12);
   openSheet(`<form><h2>${isNew ? 'Nouveau prélèvement' : 'Modifier le prélèvement'}</h2>
     <div class="field"><label>Nom</label><input name="label" value="${esc(data.label)}" placeholder="Ex : box internet, assurance auto…"></div>
-    <div class="seg"><label><input type="radio" name="kind" value="fixe" ${data.kind !== 'epargne' ? 'checked' : ''}> Charge</label><label><input type="radio" name="kind" value="epargne" ${data.kind === 'epargne' ? 'checked' : ''} ${state.accounts.length ? '' : 'disabled'}> Virement vers un livret</label></div>
-    <div class="field ${data.kind === 'epargne' ? 'hide' : ''}" id="famField"><label>Famille</label><select name="familyId">${data.familyId ? '' : '<option value="">— Choisir —</option>'}${familyOptions(data.familyId)}</select><p class="hint">Sert à l’analyse : abonnements, assurances, crédits, logement…</p></div>
-    <div class="field ${data.kind === 'epargne' ? '' : 'hide'}" id="accField"><label>Livret</label><select name="accountId">${accountOptions(data.accountId)}</select></div>
+    <div class="field"><label>Famille</label><select name="familyId">${data.familyId || data.kind === 'epargne' ? '' : '<option value="">— Choisir —</option>'}<option value="__epargne" ${data.kind === 'epargne' ? 'selected' : ''}>◎ Épargne (virement vers un livret)</option>${familyOptions(data.kind === 'epargne' ? '' : data.familyId)}</select><p class="hint">Sert à l’analyse : abonnements, assurances, crédits, logement… L'épargne n'est pas comptée comme une dépense.</p></div>
+    <div class="field hide" id="accField"><label>Livret</label><select name="accountId">${accountOptions(data.accountId)}<option value="__new">+ Nouveau livret…</option></select></div>
+    <div class="row2 hide" id="newAccField"><div class="field"><label>Nom du livret</label><input name="newAccName" placeholder="Ex : Livret A"></div><div class="field"><label>Solde actuel</label><input name="newAccBal" inputmode="decimal" placeholder="0,00"></div></div>
     <div class="seg"><label><input type="radio" name="mode" value="mensuel" ${inst || variable ? '' : 'checked'}> Fixe</label><label><input type="radio" name="mode" value="variable" ${variable ? 'checked' : ''}> Variable</label><label><input type="radio" name="mode" value="inst" ${inst ? 'checked' : ''}> En plusieurs fois</label></div>
     <p class="hint small muted hide" id="varHint" style="margin:-6px 0 12px">Pour un montant qui change chaque mois (badge télépéage, électricité…). Indique une estimation ; une fois prélevé, tu saisis le montant réel. Dès que tu as des montants réels, l'estimation devient la moyenne des 3 derniers.</p>
     <div id="mensuel" class="${inst ? 'hide' : ''}">
@@ -856,9 +856,10 @@ function sheetCharge(c) {
     const form = root.querySelector('form');
     const skips = new Set(data.skips || []);
     const sync = () => {
-      const ep = form.elements.kind.value === 'epargne';
-      root.querySelector('#famField').classList.toggle('hide', ep);
-      root.querySelector('#accField').classList.toggle('hide', !ep);
+      const ep = form.elements.familyId.value === '__epargne';
+      const newAcc = ep && (!state.accounts.length || form.elements.accountId.value === '__new');
+      root.querySelector('#accField').classList.toggle('hide', !ep || !state.accounts.length);
+      root.querySelector('#newAccField').classList.toggle('hide', !newAcc);
       const isInst = form.elements.mode.value === 'inst';
       const isVar = form.elements.mode.value === 'variable';
       root.querySelector('#varHint').classList.toggle('hide', !isVar);
@@ -877,9 +878,18 @@ function sheetCharge(c) {
       need(label, 'Indique un nom.');
       const day = parseInt(fv(f, 'day'), 10);
       need(day >= 1 && day <= 31, 'Indique le jour du prélèvement (1 à 31).');
-      const kind = f.elements.kind.value;
-      need(kind === 'epargne' || fv(f, 'familyId'), 'Choisis une famille.');
-      const common = { label, kind, day, familyId: kind === 'epargne' ? 'divers' : fv(f, 'familyId'), accountId: kind === 'epargne' ? fv(f, 'accountId') : null };
+      need(fv(f, 'familyId'), 'Choisis une famille.');
+      let pendingAccount = null;
+      const kind = fv(f, 'familyId') === '__epargne' ? 'epargne' : 'fixe';
+      let accountId = kind === 'epargne' ? fv(f, 'accountId') : null;
+      if (kind === 'epargne' && (!state.accounts.length || accountId === '__new')) {
+        const name = fv(f, 'newAccName');
+        need(name, 'Indique le nom du livret.');
+        const bal = parseAmount(fv(f, 'newAccBal')) || 0;
+        accountId = A.uid();
+        pendingAccount = { id: accountId, name, anchors: [{ date: T(), balance: bal, createdAt: A.stamp() }], createdAt: A.stamp() };
+      }
+      const common = { label, kind, day, familyId: kind === 'epargne' ? 'divers' : fv(f, 'familyId'), accountId };
       const target = c || { id: A.uid(), createdAt: A.stamp(), skips: [], history: [] };
       Object.assign(target, common);
       if (f.elements.mode.value === 'inst') {
@@ -902,6 +912,7 @@ function sheetCharge(c) {
         target.end = end;
         target.skips = [...skips].sort();
       }
+      if (pendingAccount) state.accounts.push(pendingAccount);
       if (isNew) state.charges.push(target);
       closeSheet(); commit(); toast('Prélèvement enregistré.');
     });
