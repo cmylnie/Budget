@@ -124,6 +124,13 @@ export function setChargeAmount(charge, fromYM, amount) {
   if (fromYM < charge.start) charge.start = fromYM;
 }
 
+// Montant réellement prélevé un mois donné (null pour revenir à l'estimation).
+export function setChargeActual(charge, m, amount) {
+  charge.actuals = charge.actuals || {};
+  if (amount == null) delete charge.actuals[m];
+  else charge.actuals[m] = amount;
+}
+
 export function toggleSkip(charge, m) {
   charge.skips = charge.skips || [];
   if (charge.skips.includes(m)) charge.skips = charge.skips.filter(x => x !== m);

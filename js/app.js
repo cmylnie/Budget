@@ -3,7 +3,7 @@ import * as A from './actions.js';
 import * as S from './store.js';
 import { todayISO, ym, addDays, addMonthsYM, labelDay, labelDayLong, labelMonth, MOIS, MOIS_COURT, daysInMonth } from './dates.js';
 
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 
 let state = S.load();
 let view = 'accueil';
@@ -32,7 +32,7 @@ function parseAmount(v) {
   const n = Number(t);
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
 }
-const amountValue = n => (n == null ? '' : String(n).replace('.', ','));
+const amountValue = n => (n == null || n === '' ? '' : Number.isInteger(Number(n)) ? String(n) : Number(n).toFixed(2).replace('.', ','));
 
 const famById = id => state.families.find(f => f.id === id);
 const catById = id => state.categories.find(c => c.id === id);
@@ -183,6 +183,10 @@ function viewAccueil() {
   if (d.overdue) {
     h += `<div class="banner warn"><span>Ta paie était attendue vers le <b>${labelDay(d.nextPaie)}</b> : enregistre-la dès qu'elle arrive sur ton compte.</span><button class="btn btn-primary" data-act="paie">Ma paie est arrivée</button></div>`;
   }
+  const toConfirm = d.passed.find(o => M.isEstimated(o.charge, o.month));
+  if (toConfirm) {
+    h += `<div class="banner info"><span>${esc(toConfirm.charge.label)} a été prélevé le ${labelDay(toConfirm.date)} : indique le montant réel (estimé à ${eur(toConfirm.amount)}).</span><button class="btn btn-secondary" data-act="chgreal" data-id="${toConfirm.charge.id}" data-m="${toConfirm.month}">Saisir</button></div>`;
+  }
   if (needsBackupReminder()) {
     h += `<div class="banner info"><span>💾 Pense à sauvegarder tes données (utile en cas de changement de téléphone).</span><button class="btn btn-secondary" data-act="backup">Sauvegarder</button></div>`;
   }
@@ -212,7 +216,7 @@ function viewAccueil() {
     h += `<p class="section-title">Prochains prélèvements<button class="link" data-act="go" data-id="prelevements">Tout voir</button></p>`;
     h += `<div class="section"><div class="card list" style="padding:2px 14px">${d.upcoming.slice(0, 5).map(o => `
       <div class="item" data-act="charge" data-id="${o.charge.id}"><div class="ico">${o.charge.kind === 'epargne' ? '◎' : (famById(o.charge.familyId) || {}).icon || '↧'}</div>
-      <div class="main"><p class="t">${esc(o.charge.label)}</p><p class="s">le ${labelDay(o.date)}</p></div><span class="amt">−${eur(o.amount)}</span></div>`).join('')}</div></div>`;
+      <div class="main"><p class="t">${esc(o.charge.label)}</p><p class="s">le ${labelDay(o.date)}${M.isEstimated(o.charge, o.month) ? ' · estimé' : ''}</p></div><span class="amt">${M.isEstimated(o.charge, o.month) ? '≈ ' : ''}−${eur(o.amount)}</span></div>`).join('')}</div></div>`;
   }
 
   const fc = M.forecast(state, T(), 6);
@@ -278,7 +282,7 @@ function viewJournal() {
   }
   if (f === 'tout' || f === 'prelevements') {
     for (const o of M.chargeOccurrences(state, c.start, occEnd)) {
-      entries.push({ date: o.date, createdAt: 0, html: `<div class="item" data-act="charge" data-id="${o.charge.id}"><div class="ico">${o.charge.kind === 'epargne' ? '◎' : (famById(o.charge.familyId) || {}).icon || '↧'}</div><div class="main"><p class="t">${esc(o.charge.label)}</p><p class="s">Prélèvement${o.charge.kind === 'epargne' ? ' vers ' + esc((accById(o.charge.accountId) || {}).name || 'livret') : ''} · ${labelDay(o.date)}</p></div><span class="amt">−${eur(o.amount)}</span></div>` });
+      entries.push({ date: o.date, createdAt: 0, html: `<div class="item" data-act="charge" data-id="${o.charge.id}"><div class="ico">${o.charge.kind === 'epargne' ? '◎' : (famById(o.charge.familyId) || {}).icon || '↧'}</div><div class="main"><p class="t">${esc(o.charge.label)}</p><p class="s">Prélèvement${o.charge.kind === 'epargne' ? ' vers ' + esc((accById(o.charge.accountId) || {}).name || 'livret') : ''} · ${labelDay(o.date)}</p></div><span class="amt">${M.isEstimated(o.charge, o.month) ? '≈ ' : ''}−${eur(o.amount)}</span></div>` });
     }
   }
   entries.sort(M.byDate).reverse();
@@ -395,15 +399,17 @@ function chargeStatus(c, win) {
   const occ = M.chargeOccurrences(state, win.from, win.to, x => x.id === c.id)[0];
   if (occ) {
     const inst = c.installment ? ` · échéance ${M.chargeOccurrences(state, c.start + '-01', occ.date, x => x.id === c.id).length}/${c.installment.count}` : '';
+    const est = M.isEstimated(c, occ.month);
+    const ask = est && occ.date <= T() ? ` · <button class="link" data-act="chgreal" data-id="${c.id}" data-m="${occ.month}">montant réel ?</button>` : est ? ' · estimé' : '';
     return occ.date <= T()
-      ? { amount: occ.amount, text: `<span class="badge ok">✓ prélevé</span> le ${labelDay(occ.date)}${inst}` }
-      : { amount: occ.amount, text: `<span class="badge gold">à venir</span> le ${labelDay(occ.date)}${inst}` };
+      ? { amount: occ.amount, est, text: `<span class="badge ok">✓ prélevé</span> le ${labelDay(occ.date)}${inst}${ask}` }
+      : { amount: occ.amount, est, text: `<span class="badge gold">à venir</span> le ${labelDay(occ.date)}${inst}${ask}` };
   }
   const m = ym(win.to);
   const reason = M.chargeSkipReason(c, m) || M.chargeSkipReason(c, ym(win.from));
   const txt = { saute: 'Sauté ce mois-ci', 'pas-commence': `Commence en ${labelMonth(c.start)}`, termine: 'Terminé' }[reason] || `Le ${c.day || 1} du mois · hors de ce cycle`;
   const next = M.chargeOccurrences(state, addDays(win.to, 1), addDays(win.to, 400), x => x.id === c.id)[0];
-  return { amount: next ? next.amount : 0, text: `<span class="badge">${txt}</span>`, dim: true };
+  return { amount: next ? next.amount : 0, est: next ? M.isEstimated(c, next.month) : false, text: `<span class="badge">${txt}</span>`, dim: true };
 }
 
 function viewPrelevements() {
@@ -432,8 +438,8 @@ function viewPrelevements() {
       const kind = c.kind === 'epargne' ? `Épargne → ${esc((accById(c.accountId) || {}).name || 'livret')}` : fam ? esc(fam.name) : 'Charge';
       h += `<div class="item ${st.dim ? 'dim' : ''}" data-act="charge" data-id="${c.id}">
         <div class="ico">${c.kind === 'epargne' ? '◎' : fam ? fam.icon : '↧'}</div>
-        <div class="main"><p class="t">${esc(c.label)}${c.installment ? '<span class="badge gold">' + c.installment.count + '×</span>' : ''}</p><p class="s">${kind} · ${st.text}</p></div>
-        <span class="amt ${c.kind === 'epargne' ? 'pos' : ''}">${eur(st.amount)}</span></div>`;
+        <div class="main"><p class="t">${esc(c.label)}${c.installment ? '<span class="badge gold">' + c.installment.count + '×</span>' : ''}${c.variable ? '<span class="badge">variable</span>' : ''}</p><p class="s">${kind} · ${st.text}</p></div>
+        <span class="amt ${c.kind === 'epargne' ? 'pos' : ''}">${st.est ? '≈ ' : ''}${eur(st.amount)}</span></div>`;
     }
     h += '</div></div>';
   }
@@ -817,18 +823,23 @@ function sheetCharge(c) {
   const m = ym(T());
   const data = c || { label: '', kind: 'fixe', familyId: '', accountId: defaultAccountId(), day: null, start: m, end: null, skips: [], history: [], installment: null };
   const inst = !!data.installment;
-  const cur = c && !inst ? M.chargeAmountForMonth({ ...c, skips: [] }, m < c.start ? c.start : m) : null;
+  const variable = !inst && !!data.variable;
+  const curEntry = c && !inst ? M.entryAt(c.history, m < c.start ? c.start : m, true) : null;
+  const cur = curEntry ? curEntry.amount : null;
+  const realMonths = c && variable ? A.monthsAhead(addMonthsYM(m, -5) < c.start ? c.start : addMonthsYM(m, -5), 7).filter(x => x <= addMonthsYM(m, 1) && x >= ym(state.startDate) && !M.chargeSkipReason(c, x)) : [];
   const next12 = A.monthsAhead(m, 12);
   openSheet(`<form><h2>${isNew ? 'Nouveau prélèvement' : 'Modifier le prélèvement'}</h2>
     <div class="field"><label>Nom</label><input name="label" value="${esc(data.label)}" placeholder="Ex : box internet, assurance auto…"></div>
     <div class="seg"><label><input type="radio" name="kind" value="fixe" ${data.kind !== 'epargne' ? 'checked' : ''}> Charge</label><label><input type="radio" name="kind" value="epargne" ${data.kind === 'epargne' ? 'checked' : ''} ${state.accounts.length ? '' : 'disabled'}> Virement vers un livret</label></div>
     <div class="field ${data.kind === 'epargne' ? 'hide' : ''}" id="famField"><label>Famille</label><select name="familyId">${data.familyId ? '' : '<option value="">— Choisir —</option>'}${familyOptions(data.familyId)}</select><p class="hint">Sert à l’analyse : abonnements, assurances, crédits, logement…</p></div>
     <div class="field ${data.kind === 'epargne' ? '' : 'hide'}" id="accField"><label>Livret</label><select name="accountId">${accountOptions(data.accountId)}</select></div>
-    <div class="seg"><label><input type="radio" name="mode" value="mensuel" ${inst ? '' : 'checked'}> Chaque mois</label><label><input type="radio" name="mode" value="inst" ${inst ? 'checked' : ''}> En plusieurs fois</label></div>
+    <div class="seg"><label><input type="radio" name="mode" value="mensuel" ${inst || variable ? '' : 'checked'}> Fixe</label><label><input type="radio" name="mode" value="variable" ${variable ? 'checked' : ''}> Variable</label><label><input type="radio" name="mode" value="inst" ${inst ? 'checked' : ''}> En plusieurs fois</label></div>
+    <p class="hint small muted hide" id="varHint" style="margin:-6px 0 12px">Pour un montant qui change chaque mois (badge télépéage, électricité…). Indique une estimation ; une fois prélevé, tu saisis le montant réel. Dès que tu as des montants réels, l'estimation devient la moyenne des 3 derniers.</p>
     <div id="mensuel" class="${inst ? 'hide' : ''}">
-      <div class="row2"><div class="field"><label>Montant</label><input name="amount" inputmode="decimal" value="${amountValue(cur)}"></div>
+      <div class="row2"><div class="field"><label id="amountLabel">${variable ? 'Montant estimé' : 'Montant'}</label><input name="amount" inputmode="decimal" value="${amountValue(cur)}"></div>
       <div class="field"><label>${isNew ? 'Premier mois' : 'À partir de'}</label><input type="month" name="from" value="${isNew ? m : (m < data.start ? data.start : m)}"></div></div>
-      ${!isNew && !inst ? '<p class="hint small muted" style="margin:-6px 0 12px">Nouveau tarif ? Indique le mois où il commence : les mois d’avant gardent l’ancien montant.</p>' : ''}
+      ${realMonths.length ? `<div class="field"><label>Montants réels prélevés</label>${realMonths.map(x => `<div class="row2" style="align-items:center;margin-bottom:6px"><span style="flex:0 0 42%;text-transform:capitalize">${labelMonth(x)}</span><input name="real_${x}" inputmode="decimal" placeholder="≈ ${fmt(M.variableEstimate(c, x))}" value="${amountValue(c.actuals && c.actuals[x])}" style="padding:9px 12px;border:1px solid var(--line-strong);border-radius:10px;font-size:16px;background:var(--white)"></div>`).join('')}<p class="hint">Laisse vide un mois pas encore connu : l'estimation est utilisée.</p></div>` : ''}
+      ${!isNew && !inst && !variable ? '<p class="hint small muted" style="margin:-6px 0 12px">Nouveau tarif ? Indique le mois où il commence : les mois d’avant gardent l’ancien montant.</p>' : ''}
       ${!isNew && data.history.length > 1 ? `<div class="list" style="margin:-4px 0 12px">${[...data.history].reverse().map(x => `<div class="item" style="cursor:default;padding:6px 0"><div class="main"><p class="s">Depuis ${labelMonth(x.from)}</p></div><span class="amt">${eur(x.amount)}</span></div>`).join('')}</div>` : ''}
       <div class="field"><label>Dernier mois (facultatif)</label><input type="month" name="end" value="${data.end || ''}"><p class="hint">Pour un contrat qui s'arrête. Laisse vide sinon.</p></div>
     </div>
@@ -849,6 +860,9 @@ function sheetCharge(c) {
       root.querySelector('#famField').classList.toggle('hide', ep);
       root.querySelector('#accField').classList.toggle('hide', !ep);
       const isInst = form.elements.mode.value === 'inst';
+      const isVar = form.elements.mode.value === 'variable';
+      root.querySelector('#varHint').classList.toggle('hide', !isVar);
+      root.querySelector('#amountLabel').textContent = isVar ? 'Montant estimé' : 'Montant';
       root.querySelector('#mensuel').classList.toggle('hide', isInst);
       root.querySelector('#inst').classList.toggle('hide', !isInst);
       const tot = parseAmount(fv(form, 'total')), n = parseInt(fv(form, 'count'), 10);
@@ -871,13 +885,18 @@ function sheetCharge(c) {
       if (f.elements.mode.value === 'inst') {
         const total = parseAmount(fv(f, 'total')), count = parseInt(fv(f, 'count'), 10);
         need(total > 0 && count >= 2, 'Indique le montant total et le nombre de fois (2 minimum).');
-        Object.assign(target, { installment: { total, count }, start: fv(f, 'instStart') || m, end: null, history: [], skips: [] });
+        Object.assign(target, { installment: { total, count }, start: fv(f, 'instStart') || m, end: null, history: [], skips: [], variable: false });
       } else {
         const amount = parseAmount(fv(f, 'amount'));
         need(amount > 0, 'Indique le montant.');
         const from = fv(f, 'from') || m;
         if (isNew || target.installment) Object.assign(target, { installment: null, start: from, history: [{ from, amount }] });
-        else if (M.chargeAmountForMonth({ ...target, skips: [] }, from) !== amount) A.setChargeAmount(target, from, amount);
+        else if ((M.entryAt(target.history, from, true) || {}).amount !== amount) A.setChargeAmount(target, from, amount);
+        target.variable = f.elements.mode.value === 'variable';
+        for (const x of realMonths) {
+          const el = f.elements['real_' + x];
+          if (el) A.setChargeActual(target, x, parseAmount(el.value));
+        }
         const end = fv(f, 'end') || null;
         need(!end || end >= target.start, 'Le dernier mois doit être après le premier.');
         target.end = end;
@@ -888,6 +907,23 @@ function sheetCharge(c) {
     });
   });
 }
+function sheetChargeReal(c, month) {
+  const est = M.variableEstimate(c, month);
+  openSheet(`<form><h2>${esc(c.label)}</h2>
+    <p class="intro">Montant réellement prélevé en ${labelMonth(month)} (estimé à ${eur(est)}).</p>
+    <div class="field amount"><input name="amount" inputmode="decimal" placeholder="${fmt(est)}" value="${amountValue(c.actuals && c.actuals[month])}" aria-label="Montant réel"></div>
+    ${buttons('Enregistrer')}</form>`, root => {
+    bindForm(root, f => {
+      const v = parseAmount(fv(f, 'amount'));
+      need(v != null && v >= 0, 'Indique le montant prélevé.');
+      A.setChargeActual(c, month, v);
+      closeSheet(); commit(); toast('Montant réel enregistré.');
+    });
+    setTimeout(() => root.querySelector('[name="amount"]').focus(), 60);
+  });
+}
+ACTIONS.chgreal = (id, el) => sheetChargeReal(state.charges.find(c => c.id === id), el.dataset.m);
+
 ACTIONS.delcharge = id => {
   if (!confirm("Supprimer ce prélèvement de tout l'historique ?\n\nS'il s'arrête simplement, indique plutôt un « dernier mois » : les mois passés resteront justes.")) return;
   closeSheet();

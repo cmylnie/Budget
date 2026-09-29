@@ -57,7 +57,9 @@ dans le temps est **datée** : modifier quelque chose n'affecte jamais le passé
 - **Solde prévu avant la paie** = solde − prélèvements d'ici la paie estimée ;
   **hors enveloppes** = solde prévu − reste à dépenser (négatif : alerte).
 - **Prélèvements** : montant daté par mois (`history`), mois sautés (`skips`), fin (`end`), ou
-  paiement en N fois (le dernier versement absorbe l'arrondi). Un virement automatique
+  paiement en N fois (le dernier versement absorbe l'arrondi), ou montant **variable** (`variable:true`,
+  `actuals:{'YYYY-MM': montant réel}`) : sans montant réel saisi, on prend la moyenne des 3 derniers
+  montants réels, sinon l'estimation de `history`. Un virement automatique
   (`kind:'epargne'`) crédite son livret.
 - **Projets** : l'argent est rangé sur un livret. « Mettre de côté » crée un virement (ou réserve de
   l'argent déjà présent) ; « Utiliser » le rapatrie et enregistre la dépense en enveloppe `projet`,

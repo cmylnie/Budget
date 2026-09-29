@@ -168,3 +168,23 @@ test('prévisions : salaire prévu moins prélèvements et enveloppes', () => {
   assert.equal(rows[0].epargne, 20);
   assert.equal(rows[0].reste, M.r2(2452.04 - 359.25 - 20 - 400));
 });
+
+test('montant variable : estimation, montant réel, moyenne des 3 derniers', () => {
+  const { s } = base();
+  const c = { id: 'peage', label: 'Badge péage', familyId: 'transport', kind: 'fixe', day: 3, start: '2026-10', end: null, skips: [], history: [{ from: '2026-10', amount: 70 }], installment: null, variable: true, actuals: {} };
+  s.charges.push(c);
+  assert.equal(M.chargeAmountForMonth(c, '2026-10'), 70);
+  assert.equal(M.isEstimated(c, '2026-10'), true);
+  A.setChargeActual(c, '2026-10', 82.4);
+  assert.equal(M.chargeAmountForMonth(c, '2026-10'), 82.4);
+  assert.equal(M.isEstimated(c, '2026-10'), false);
+  A.setChargeActual(c, '2026-11', 60);
+  A.setChargeActual(c, '2026-12', 95.6);
+  assert.equal(M.chargeAmountForMonth(c, '2027-01'), M.r2((82.4 + 60 + 95.6) / 3));
+  // le solde utilise le montant réel une fois saisi
+  const before = M.accountBalance(s, '2026-10-04');
+  A.setChargeActual(c, '2026-10', 100);
+  assert.equal(M.accountBalance(s, '2026-10-04'), M.r2(before - 17.6));
+  A.setChargeActual(c, '2026-10', null);
+  assert.equal(M.chargeAmountForMonth(c, '2026-10'), 70);
+});

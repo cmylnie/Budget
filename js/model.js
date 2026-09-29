@@ -70,8 +70,25 @@ export function chargeSkipReason(c, m) {
 export function chargeAmountForMonth(c, m) {
   if (chargeSkipReason(c, m)) return 0;
   if (c.installment) return installmentAmount(c.installment, monthDiff(c.start, m));
+  if (c.variable) {
+    const real = c.actuals && c.actuals[m];
+    return real != null ? real : variableEstimate(c, m);
+  }
   const e = entryAt(c.history, m);
   return e ? e.amount : 0;
+}
+
+// Montant variable (péage, électricité…) : tant que le montant réel du mois n'est pas saisi, on prend
+// la moyenne des 3 derniers montants réels, ou à défaut le montant estimé indiqué.
+export function variableEstimate(c, m) {
+  const prev = Object.keys(c.actuals || {}).filter(k => k < m && c.actuals[k] != null).sort().slice(-3);
+  if (prev.length) return r2(prev.reduce((s, k) => s + c.actuals[k], 0) / prev.length);
+  const e = entryAt(c.history, m, true);
+  return e ? e.amount : 0;
+}
+
+export function isEstimated(c, m) {
+  return !!c.variable && !(c.actuals && c.actuals[m] != null);
 }
 
 // Occurrences datées des prélèvements entre `from` et `to` inclus.
