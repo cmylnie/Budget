@@ -170,7 +170,7 @@ export function reservedOnAccount(state, accountId) {
 
 // Nombre de paies restantes avant l'échéance (au moins 1).
 export function paiesUntil(state, today, due) {
-  const payDay = state.settings.paydayEstimateDay || 25;
+  const payDay = state.settings.paydayEstimateDay || 30;
   let n = monthDiff(ym(today), ym(due));
   if (dayOf(due) < payDay) n -= 1;         // la paie du mois de l'échéance arrive trop tard
   if (dayOf(today) < payDay && !paidThisMonth(state, today)) n += 1; // la paie de ce mois-ci est encore à venir
@@ -206,7 +206,7 @@ export function currentCycle(state, today) {
 
 // Date estimée de la paie suivante : le jour habituel (25 par défaut) du mois d'après.
 export function expectedNextPaie(state, cycle) {
-  const day = state.settings.paydayEstimateDay || 25;
+  const day = state.settings.paydayEstimateDay || 30;
   const m = dayOf(cycle.start) >= 15 ? addMonthsYM(ym(cycle.start), 1) : ym(cycle.start);
   return dateInMonth(m, day);
 }
@@ -274,7 +274,7 @@ export function dashboard(state, today) {
 export function forecast(state, today, n = 6) {
   const cycle = currentCycle(state, today);
   if (!cycle) return [];
-  const day = state.settings.paydayEstimateDay || 25;
+  const day = state.settings.paydayEstimateDay || 30;
   const first = ym(expectedNextPaie(state, cycle));
   const rows = [];
   for (let k = 0; k < n; k++) {

@@ -3,7 +3,7 @@ import * as A from './actions.js';
 import * as S from './store.js';
 import { todayISO, ym, addDays, addMonthsYM, labelDay, labelDayLong, labelMonth, MOIS, MOIS_COURT, daysInMonth } from './dates.js';
 
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 
 let state = S.load();
 let view = 'accueil';
@@ -407,8 +407,9 @@ function chargeStatus(c, win) {
   }
   const m = ym(win.to);
   const reason = M.chargeSkipReason(c, m) || M.chargeSkipReason(c, ym(win.from));
-  const txt = { saute: 'Sauté ce mois-ci', 'pas-commence': `Commence en ${labelMonth(c.start)}`, termine: 'Terminé' }[reason] || `Le ${c.day || 1} du mois · hors de ce cycle`;
   const next = M.chargeOccurrences(state, addDays(win.to, 1), addDays(win.to, 400), x => x.id === c.id)[0];
+  const txt = { saute: 'Sauté ce mois-ci', 'pas-commence': `Commence en ${labelMonth(c.start)}`, termine: 'Terminé' }[reason]
+    || (next ? `Prochain le ${labelDay(next.date)}, après la paie` : `Le ${c.day || 1} du mois`);
   return { amount: next ? next.amount : 0, est: next ? M.isEstimated(c, next.month) : false, text: `<span class="badge">${txt}</span>`, dim: true };
 }
 
@@ -530,7 +531,7 @@ function viewReglages() {
     </form>
     ${state.settings.salaryHistory.length > 1 ? `<div class="list" style="margin-top:8px">${[...state.settings.salaryHistory].reverse().map(x => `<div class="item" style="cursor:default"><div class="main"><p class="s">Depuis ${labelMonth(x.from)}</p></div><span class="amt">${eur(x.amount)}</span></div>`).join('')}</div>` : ''}
     <div class="field" style="margin-top:16px"><label>Jour estimé de la paie</label><input type="number" id="payDay" min="1" max="31" value="${state.settings.paydayEstimateDay}">
-    <p class="hint">Ta paie arrive entre le 25 et le 30 : garde le 25 pour être prudente. Le vrai cycle commence le jour où tu enregistres ta paie.</p></div>
+    <p class="hint">Ta paie arrive entre le 25 et le 30 : garde le 30 pour être prudente (les prélèvements jusqu'au 29 sont comptés avant la paie). Le vrai cycle commence le jour où tu enregistres ta paie.</p></div>
   </div></div>`;
 
   h += `<p class="section-title">Extras prévus sur la paie<button class="link" data-act="extra">+ Ajouter</button></p><div class="section"><div class="card">
@@ -839,6 +840,7 @@ function sheetCharge(c) {
       <div class="row2"><div class="field"><label id="amountLabel">${variable ? 'Montant estimé' : 'Montant'}</label><input name="amount" inputmode="decimal" value="${amountValue(cur)}"></div>
       <div class="field"><label>${isNew ? 'Premier mois' : 'À partir de'}</label><input type="month" name="from" value="${isNew ? m : (m < data.start ? data.start : m)}"></div></div>
       ${realMonths.length ? `<div class="field"><label>Montants réels prélevés</label>${realMonths.map(x => `<div class="row2" style="align-items:center;margin-bottom:6px"><span style="flex:0 0 42%;text-transform:capitalize">${labelMonth(x)}</span><input name="real_${x}" inputmode="decimal" placeholder="≈ ${fmt(M.variableEstimate(c, x))}" value="${amountValue(c.actuals && c.actuals[x])}" style="padding:9px 12px;border:1px solid var(--line-strong);border-radius:10px;font-size:16px;background:var(--white)"></div>`).join('')}<p class="hint">Laisse vide un mois pas encore connu : l'estimation est utilisée.</p></div>` : ''}
+      ${isNew ? '<p class="hint small muted" style="margin:-6px 0 12px">Laisse le mois en cours : un prélèvement déjà passé avant ton solde de départ n’est pas compté une deuxième fois.</p>' : ''}
       ${!isNew && !inst && !variable ? '<p class="hint small muted" style="margin:-6px 0 12px">Nouveau tarif ? Indique le mois où il commence : les mois d’avant gardent l’ancien montant.</p>' : ''}
       ${!isNew && data.history.length > 1 ? `<div class="list" style="margin:-4px 0 12px">${[...data.history].reverse().map(x => `<div class="item" style="cursor:default;padding:6px 0"><div class="main"><p class="s">Depuis ${labelMonth(x.from)}</p></div><span class="amt">${eur(x.amount)}</span></div>`).join('')}</div>` : ''}
       <div class="field"><label>Dernier mois (facultatif)</label><input type="month" name="end" value="${data.end || ''}"><p class="hint">Pour un contrat qui s'arrête. Laisse vide sinon.</p></div>

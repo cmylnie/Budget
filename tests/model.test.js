@@ -45,8 +45,8 @@ test('solde du compte : prélèvements passés et dépenses retirés', () => {
 test('tableau de bord : jours avant la paie estimée, prélèvements à venir', () => {
   const { s } = base();
   const d = M.dashboard(s, '2026-09-29');
-  assert.equal(d.nextPaie, '2026-10-25');
-  assert.equal(d.daysLeft, 26);
+  assert.equal(d.nextPaie, '2026-10-30');
+  assert.equal(d.daysLeft, 31);
   assert.equal(d.overdue, false);
   assert.equal(d.aVenir, M.r2(20 + 15.99 + 343.26));
   assert.equal(d.resteADepenser, 400);
@@ -55,7 +55,7 @@ test('tableau de bord : jours avant la paie estimée, prélèvements à venir', 
 
 test('paie en retard : plus de « 1 jour » bloqué, la paie est signalée comme attendue', () => {
   const { s } = base();
-  const d = M.dashboard(s, '2026-10-27');
+  const d = M.dashboard(s, '2026-10-31');
   assert.equal(d.overdue, true);
   assert.equal(d.daysLeft, 0);
 });
@@ -187,4 +187,13 @@ test('montant variable : estimation, montant réel, moyenne des 3 derniers', () 
   assert.equal(M.accountBalance(s, '2026-10-04'), M.r2(before - 17.6));
   A.setChargeActual(c, '2026-10', null);
   assert.equal(M.chargeAmountForMonth(c, '2026-10'), 70);
+});
+
+test('un prélèvement du 25 tombe avant la paie estimée (entre le 25 et le 30)', () => {
+  const { s } = base();
+  s.charges.push({ id: 'p25', label: 'Crédit', familyId: 'credits', kind: 'fixe', accountId: null, day: 25, start: '2026-09', end: null, skips: [], history: [{ from: '2026-09', amount: 100 }], installment: null });
+  const d = M.dashboard(s, '2026-09-29');
+  assert.ok(d.upcoming.some(o => o.charge.id === 'p25' && o.date === '2026-10-25'));
+  // celui du 25 septembre, avant le solde de départ, n'est pas recompté
+  assert.equal(M.accountBalance(s, '2026-09-29'), 2800);
 });

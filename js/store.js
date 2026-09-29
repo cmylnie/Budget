@@ -56,6 +56,9 @@ function addNewDefaults(s) {
   for (const { since, ...c } of DEFAULT_CATEGORIES) {
     if (since > from && !s.categories.some(x => x.id === c.id)) s.categories.push(c);
   }
+  // v3 : la paie (entre le 25 et le 30) est estimée au plus tard, pour que les prélèvements du 25 au 29
+  // soient comptés avant la paie. L'ancienne valeur par défaut (25) est remplacée.
+  if (from < 3 && s.settings.paydayEstimateDay === 25) s.settings.paydayEstimateDay = 30;
   s.settings.defaultsVersion = DEFAULTS_VERSION;
 }
 

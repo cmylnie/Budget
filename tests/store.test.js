@@ -16,3 +16,13 @@ test('les nouvelles familles par défaut sont ajoutées une seule fois aux donn�
   s.families = s.families.filter(f => f.id !== 'voyages');
   assert.ok(!normalize(s).families.some(f => f.id === 'voyages'));
 });
+
+test('ancienne estimation de paie au 25 remplacée par le 30', () => {
+  const old = emptyState();
+  delete old.settings.defaultsVersion;
+  old.settings.paydayEstimateDay = 25;
+  assert.equal(normalize(old).settings.paydayEstimateDay, 30);
+  const chosen = emptyState();
+  chosen.settings.paydayEstimateDay = 27;
+  assert.equal(normalize(chosen).settings.paydayEstimateDay, 27);
+});
