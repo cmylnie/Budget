@@ -3,6 +3,9 @@
 
 export const APP_ID = 'mes-enveloppes';
 export const SCHEMA_VERSION = 1;
+// Incrémenté quand on ajoute des familles/catégories par défaut : elles sont alors ajoutées une fois
+// aux données existantes (voir store.normalize), sans recréer celles que l'utilisatrice a supprimées avant.
+export const DEFAULTS_VERSION = 2;
 
 export const DEFAULT_FAMILIES = [
   { id: 'alimentation', name: 'Alimentation', icon: '🛒' },
@@ -13,6 +16,7 @@ export const DEFAULT_FAMILIES = [
   { id: 'loisirs', name: 'Loisirs', icon: '🎨' },
   { id: 'shopping', name: 'Shopping', icon: '👗' },
   { id: 'cadeaux', name: 'Cadeaux', icon: '🎁' },
+  { id: 'voyages', name: 'Voyages', icon: '✈️', since: 2 },
   { id: 'logement', name: 'Logement & foyer', icon: '🏡' },
   { id: 'assurances', name: 'Assurances', icon: '🛡️' },
   { id: 'abonnements', name: 'Abonnements', icon: '📱' },
@@ -20,7 +24,7 @@ export const DEFAULT_FAMILIES = [
   { id: 'divers', name: 'Divers', icon: '✳️' },
 ];
 
-const cat = (id, name, familyId, envelope) => ({ id, name, familyId, envelope });
+const cat = (id, name, familyId, envelope, since) => ({ id, name, familyId, envelope, ...(since ? { since } : {}) });
 
 export const DEFAULT_CATEGORIES = [
   cat('courses', 'Courses', 'alimentation', 'quotidien'),
@@ -51,6 +55,10 @@ export const DEFAULT_CATEGORIES = [
   cat('high-tech', 'High-tech', 'shopping', 'plaisirs'),
   cat('coup-de-coeur', 'Coup de cœur', 'shopping', 'plaisirs'),
   cat('cadeaux', 'Cadeaux', 'cadeaux', 'plaisirs'),
+  cat('billets', 'Billets (avion, train…)', 'voyages', 'plaisirs', 2),
+  cat('hebergement', 'Hébergement', 'voyages', 'plaisirs', 2),
+  cat('location-voiture', 'Location de voiture', 'voyages', 'plaisirs', 2),
+  cat('visites', 'Visites & activités', 'voyages', 'plaisirs', 2),
   cat('autre', 'Autre', 'divers', 'quotidien'),
 ];
 
@@ -65,6 +73,7 @@ export function emptyState() {
       salaryHistory: [],     // [{from:"YYYY-MM", amount}]
       envelopeHistory: [],   // [{from:"YYYY-MM-DD", quotidien, plaisirs}]
       lastBackupAt: null,
+      defaultsVersion: DEFAULTS_VERSION,
     },
     anchors: [],            // recalages du compte courant [{id, date, balance, createdAt}]
     paies: [],              // [{id, date, amount, note, createdAt}]
@@ -72,8 +81,8 @@ export function emptyState() {
     incomes: [],            // [{id, date, amount, label, createdAt}]
     charges: [],            // voir docs/SPEC.md
     expenses: [],           // [{id, date, amount, label, categoryId, envelope, projectId, createdAt}]
-    families: DEFAULT_FAMILIES.map(f => ({ ...f })),
-    categories: DEFAULT_CATEGORIES.map(c => ({ ...c })),
+    families: DEFAULT_FAMILIES.map(({ since, ...f }) => f),
+    categories: DEFAULT_CATEGORIES.map(({ since, ...c }) => c),
     accounts: [],           // livrets [{id, name, anchors:[{date, balance, createdAt}], createdAt}]
     movements: [],          // [{id, date, accountId, direction:'vers'|'depuis', amount, label, projectId, kind, createdAt}]
     projects: [],           // [{id, name, target, due, yearly, accountId, status, createdAt}]

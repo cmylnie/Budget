@@ -3,7 +3,7 @@ import * as A from './actions.js';
 import * as S from './store.js';
 import { todayISO, ym, addDays, addMonthsYM, labelDay, labelDayLong, labelMonth, MOIS, MOIS_COURT, daysInMonth } from './dates.js';
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.2.0';
 
 let state = S.load();
 let view = 'accueil';

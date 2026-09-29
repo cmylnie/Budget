@@ -1,5 +1,5 @@
 // Persistance locale (localStorage) + sauvegarde/restauration en fichier JSON.
-import { APP_ID, SCHEMA_VERSION, emptyState } from './defaults.js';
+import { APP_ID, SCHEMA_VERSION, DEFAULTS_VERSION, DEFAULT_FAMILIES, DEFAULT_CATEGORIES, emptyState } from './defaults.js';
 
 const KEY = 'mes-enveloppes:v1';
 
@@ -35,8 +35,28 @@ export function normalize(s) {
     if (Array.isArray(base[k]) && !Array.isArray(out[k])) out[k] = base[k];
   }
   if (!out.cycles || typeof out.cycles !== 'object') out.cycles = {};
+  // Données enregistrées avant l'apparition de ce champ : version 1 des valeurs par défaut.
+  out.settings.defaultsVersion = (s.settings && s.settings.defaultsVersion) || 1;
+  addNewDefaults(out);
   out.version = SCHEMA_VERSION;
   return out;
+}
+
+function addNewDefaults(s) {
+  const from = s.settings.defaultsVersion || 1;
+  if (from >= DEFAULTS_VERSION) return;
+  for (const { since, ...f } of DEFAULT_FAMILIES) {
+    if (since > from && !s.families.some(x => x.id === f.id)) {
+      // rangée à la même place que dans la liste par défaut (après la famille qui la précède)
+      const prev = DEFAULT_FAMILIES[DEFAULT_FAMILIES.findIndex(x => x.id === f.id) - 1];
+      const at = prev ? s.families.findIndex(x => x.id === prev.id) : -1;
+      s.families.splice(at >= 0 ? at + 1 : s.families.length, 0, f);
+    }
+  }
+  for (const { since, ...c } of DEFAULT_CATEGORIES) {
+    if (since > from && !s.categories.some(x => x.id === c.id)) s.categories.push(c);
+  }
+  s.settings.defaultsVersion = DEFAULTS_VERSION;
 }
 
 export function parseBackup(text) {
