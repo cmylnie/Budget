@@ -1,7 +1,7 @@
 // Service worker : l'appli s'ouvre même sans réseau.
 // Stratégie « réseau d'abord » : dès qu'il y a du réseau, on récupère la dernière version
 // (les mises à jour arrivent toutes seules), sinon on sert la copie gardée en cache.
-const CACHE = 'mes-enveloppes-v7';
+const CACHE = 'mes-enveloppes-v8';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/app.js', 'js/model.js', 'js/actions.js', 'js/store.js', 'js/dates.js', 'js/defaults.js',

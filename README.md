@@ -44,7 +44,8 @@ dans ton téléphone.
 
 ## Changer de téléphone
 
-1. Ancien téléphone : ⚙ Réglages → **Sauvegarder** → envoie-toi le fichier (Drive, e-mail…).
+1. Ancien téléphone : ⚙ Réglages → **Sauvegarder** → **Envoyer vers Drive, e-mail…** (le fichier part en
+   `.txt`, seul format que Chrome accepte de partager ; `.json` et `.txt` se restaurent tous les deux).
 2. Nouveau téléphone : ouvre l'adresse de l'appli dans Chrome et installe-la.
 3. Au premier écran : **J'ai une sauvegarde à restaurer** (ou ⚙ Réglages → **Restaurer**) et choisis
    le fichier.

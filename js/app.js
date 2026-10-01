@@ -3,7 +3,7 @@ import * as A from './actions.js';
 import * as S from './store.js';
 import { todayISO, ym, addDays, addMonthsYM, labelDay, labelDayLong, labelMonth, MOIS, MOIS_COURT, daysInMonth } from './dates.js';
 
-const APP_VERSION = '2.4.1';
+const APP_VERSION = '2.4.2';
 
 let state = S.load();
 let view = 'accueil';
@@ -558,7 +558,7 @@ function viewReglages() {
   h += `<p class="section-title">Sauvegarde</p><div class="section"><div class="card">
     <p style="margin:0 0 10px">Dernière sauvegarde : <b>${last ? labelDayLong(todayISO(new Date(last))) : 'jamais'}</b></p>
     <div class="btns"><button class="btn btn-primary" data-act="backup">Sauvegarder</button><button class="btn btn-secondary" data-act="restore">Restaurer</button></div>
-    <input type="file" id="restoreFile" accept="application/json,.json" class="hide">
+    <input type="file" id="restoreFile" accept="application/json,.json,text/plain,.txt" class="hide">
     <details class="fold" style="margin-top:14px"><summary class="link">Changer de téléphone : comment faire ?</summary>
       <ol class="small" style="line-height:1.6;padding-left:18px;margin:8px 0 0">
         <li>Sur l'ancien téléphone : <b>Sauvegarder</b>, puis envoie-toi le fichier (Drive, e-mail, WhatsApp…).</li>
@@ -1231,14 +1231,15 @@ ACTIONS.delcategory = id => {
 
 /* ================= Sauvegarde ================= */
 
-function backupFile() {
-  const name = `mes-enveloppes-${T()}.json`;
-  return new File([JSON.stringify(state, null, 1)], name, { type: 'application/json' });
+// Chrome sur Android refuse de partager un .json : pour l'envoi (Drive, e-mail…), la même sauvegarde
+// part en .txt, un type qu'il accepte. La restauration lit les deux.
+function backupFile(forShare = false) {
+  const name = `mes-enveloppes-${T()}.${forShare ? 'txt' : 'json'}`;
+  return new File([JSON.stringify(state, null, 1)], name, { type: forShare ? 'text/plain' : 'application/json' });
 }
 
 function sheetBackup() {
-  const file = backupFile();
-  const canShare = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+  const canShare = !!(navigator.canShare && navigator.canShare({ files: [backupFile(true)] }));
   openSheet(`<div><h2>Sauvegarder mes données</h2>
     <p class="intro">Un petit fichier qui contient tout ton budget. Garde-le en lieu sûr (Google Drive, e-mail…) : il permet de tout retrouver sur un nouveau téléphone.</p>
     ${canShare ? '<button class="btn btn-primary" data-act="doshare" style="margin-bottom:10px">Envoyer vers Drive, e-mail…</button>' : ''}
@@ -1249,7 +1250,7 @@ function markBackup() { state.settings.lastBackupAt = Date.now(); S.save(state);
 ACTIONS.closesheet = () => closeSheet();
 ACTIONS.doshare = async () => {
   try {
-    await navigator.share({ files: [backupFile()], title: 'Sauvegarde Mes Enveloppes' });
+    await navigator.share({ files: [backupFile(true)] });
     markBackup(); closeSheet(); render(); toast('Sauvegarde envoyée.');
   } catch (e) { if (e.name !== 'AbortError') toast('Partage impossible, utilise « Enregistrer dans Téléchargements ».'); }
 };
@@ -1294,7 +1295,7 @@ function renderWizard() {
       Quelques questions pour démarrer (2 minutes). Tu auras besoin du <b>solde de ton compte</b> et de celui de <b>tes livrets</b>.</p>
       <button class="btn btn-primary">Commencer</button>
       <button type="button" class="btn btn-secondary" data-act="restore" style="margin-top:10px">J'ai une sauvegarde à restaurer</button>
-      <input type="file" id="wizRestore" accept="application/json,.json" class="hide">`;
+      <input type="file" id="wizRestore" accept="application/json,.json,text/plain,.txt" class="hide">`;
   } else if (w.step === 1) {
     h += `${head(1)}<h2>Ton compte courant</h2><p class="lead">Quel est le solde affiché par ta banque aujourd'hui ?</p>
       <div class="field amount"><input name="balance" inputmode="decimal" placeholder="0,00 €" value="${esc(w.balance)}"></div>`;
