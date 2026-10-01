@@ -3,7 +3,7 @@ import * as A from './actions.js';
 import * as S from './store.js';
 import { todayISO, ym, addDays, addMonthsYM, labelDay, labelDayLong, labelMonth, MOIS, MOIS_COURT, daysInMonth } from './dates.js';
 
-const APP_VERSION = '2.4.0';
+const APP_VERSION = '2.4.1';
 
 let state = S.load();
 let view = 'accueil';
@@ -196,9 +196,11 @@ function viewAccueil() {
     <div class="hero-card"><p class="lbl">Sur le compte</p><p class="big ${d.solde < 0 ? 'neg' : ''}">${bigEur(d.solde)}</p><p class="sub">estimé aujourd'hui</p><button class="link" data-act="recaler">Recaler avec ma banque</button></div>
   </div>`;
   h += `<div class="card summary">
-    <div class="row"><span>Prélèvements à venir d'ici la paie</span><b class="neg">${d.aVenir ? '−' + eur(d.aVenir) : eur(0)}</b></div>
-    <div class="row"><span>Solde prévu juste avant la paie</span><b>${eur(d.soldePrevu)}</b></div>
-    <div class="row"><span>Hors enveloppes</span><b class="${d.nonAffecte < 0 ? 'neg' : 'pos'}">${eur(d.nonAffecte)}</b></div>
+    <div class="row"><span>Sur le compte aujourd'hui</span><b>${eur(d.solde)}</b></div>
+    <div class="row"><span>− Prélèvements à venir d'ici la paie</span><b class="neg">−${eur(d.aVenir)}</b></div>
+    <div class="row"><span>− Reste à dépenser (enveloppes)</span><b class="neg">−${eur(d.resteADepenser)}</b></div>
+    <div class="row"><span><b style="font-family:inherit">= Il te restera avant la paie</b></span><b class="${d.nonAffecte < 0 ? 'neg' : 'pos'}" style="font-size:16px">${eur(d.nonAffecte)}</b></div>
+    <p class="small muted" style="margin:6px 0 0">Si tu dépenses tout le budget de tes enveloppes. Cet argent peut aller vers l'épargne ou un projet.</p>
   </div>`;
   if (d.nonAffecte < 0) {
     h += `<div class="banner alert"><span>Tes enveloppes dépassent de <b>${eur(-d.nonAffecte)}</b> ce qui restera sur ton compte. Réduis un budget, ou recale ton solde s'il n'est plus juste.</span></div>`;
