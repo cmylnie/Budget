@@ -48,7 +48,10 @@ export function entryAt(history, key, fallbackFirst = false) {
 
 /* ---------- Prélèvements ---------- */
 
+// Montants de chaque échéance : saisis (inst.amounts, ex. 4× sans frais aux montants inégaux),
+// sinon partage égal où le dernier versement absorbe l'arrondi.
 export function installmentAmount(inst, idx) {
+  if (inst.amounts && inst.amounts[idx] != null) return inst.amounts[idx];
   const base = Math.floor((inst.total / inst.count) * 100) / 100;
   return idx === inst.count - 1 ? r2(inst.total - base * (inst.count - 1)) : base;
 }

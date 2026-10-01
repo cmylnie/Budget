@@ -3,7 +3,7 @@ import * as A from './actions.js';
 import * as S from './store.js';
 import { todayISO, ym, addDays, addMonthsYM, labelDay, labelDayLong, labelMonth, MOIS, MOIS_COURT, daysInMonth } from './dates.js';
 
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.4.0';
 
 let state = S.load();
 let view = 'accueil';
@@ -848,7 +848,8 @@ function sheetCharge(c) {
     <div id="inst" class="${inst ? '' : 'hide'}">
       <div class="row2"><div class="field"><label>Montant total</label><input name="total" inputmode="decimal" value="${amountValue(inst ? data.installment.total : '')}"></div>
       <div class="field"><label>Nombre de fois</label><input type="number" name="count" min="2" max="48" value="${inst ? data.installment.count : 4}"></div></div>
-      <div class="field"><label>Première échéance</label><input type="month" name="instStart" value="${data.start}"></div>
+      <div class="field"><label>Première échéance</label><input type="month" name="instStart" value="${data.start}"><p class="hint">Une échéance déjà payée avant ton solde de départ n'est pas recomptée : tu peux la saisir pour garder le compte juste (2/4, 3/4…).</p></div>
+      <div class="field"><label>Montant de chaque échéance</label><div id="echList"></div><p class="hint">Les échéances ont des montants différents ? Remplis celles que tu connais, le reste du total est partagé entre les autres.</p></div>
       <p class="small pos" id="instPreview" style="margin:-4px 0 12px"></p>
     </div>
     <div class="field"><label>Jour du prélèvement</label><input type="number" name="day" min="1" max="31" value="${data.day || ''}" placeholder="Ex : 5"></div>
@@ -857,6 +858,39 @@ function sheetCharge(c) {
   </form>`, root => {
     const form = root.querySelector('form');
     const skips = new Set(data.skips || []);
+    // Échéances : valeurs saisies (texte) ; les cases vides se partagent le reste du total.
+    const ech = inst && data.installment.amounts ? data.installment.amounts.map(amountValue) : [];
+    let echKey = '';
+    const echSplit = () => {
+      const n = parseInt(fv(form, 'count'), 10) || 0;
+      const total = parseAmount(fv(form, 'total')) || 0;
+      const vals = Array.from({ length: n }, (_, i) => parseAmount(ech[i]));
+      const free = vals.map((v, i) => (v == null ? i : -1)).filter(i => i >= 0);
+      const rest = M.r2(total - vals.reduce((s, v) => s + (v || 0), 0));
+      const each = free.length ? Math.floor((rest / free.length) * 100) / 100 : 0;
+      free.forEach((i, k) => { vals[i] = k === free.length - 1 ? M.r2(rest - each * (free.length - 1)) : each; });
+      return { n, total, vals, rest, custom: free.length < n };
+    };
+    const renderEch = () => {
+      const n = Math.min(48, parseInt(fv(form, 'count'), 10) || 0);
+      const start = fv(form, 'instStart') || m;
+      const key = n + '|' + start;
+      if (key !== echKey) {
+        echKey = key;
+        root.querySelector('#echList').innerHTML = Array.from({ length: n }, (_, i) => {
+          const mo = addMonthsYM(start, i);
+          return `<div class="row2" style="align-items:center;margin-bottom:6px"><span style="flex:0 0 42%">${i + 1}. ${MOIS_COURT[Number(mo.slice(5)) - 1]} ${mo.slice(0, 4)}</span><input data-ech="${i}" inputmode="decimal" value="${esc(ech[i] || '')}" style="padding:9px 12px;border:1px solid var(--line-strong);border-radius:10px;font-size:16px;background:var(--white)"></div>`;
+        }).join('');
+        root.querySelectorAll('[data-ech]').forEach(inp => { inp.oninput = () => { ech[Number(inp.dataset.ech)] = inp.value; showSplit(); }; });
+      }
+      showSplit();
+    };
+    const showSplit = () => {
+      const { vals, rest, custom } = echSplit();
+      root.querySelectorAll('[data-ech]').forEach(inp => { inp.placeholder = fmt(vals[Number(inp.dataset.ech)] || 0); });
+      root.querySelector('#instPreview').textContent = !vals.length ? '' : rest < 0 ? '⚠️ Les échéances saisies dépassent le total.'
+        : custom ? `Échéances : ${vals.map(v => fmt(v)).join(' · ')} €` : `Soit ${plural(vals.length, 'échéance')} de ${eur(vals[0])}`;
+    };
     const sync = () => {
       const ep = form.elements.familyId.value === '__epargne';
       const newAcc = ep && (!state.accounts.length || form.elements.accountId.value === '__new');
@@ -868,8 +902,7 @@ function sheetCharge(c) {
       root.querySelector('#amountLabel').textContent = isVar ? 'Montant estimé' : 'Montant';
       root.querySelector('#mensuel').classList.toggle('hide', isInst);
       root.querySelector('#inst').classList.toggle('hide', !isInst);
-      const tot = parseAmount(fv(form, 'total')), n = parseInt(fv(form, 'count'), 10);
-      root.querySelector('#instPreview').textContent = tot > 0 && n >= 2 ? `Soit ${plural(n, 'échéance')} de ${eur(M.installmentAmount({ total: tot, count: n }, 0))}` : '';
+      if (isInst) renderEch();
     };
     form.addEventListener('change', sync);
     form.addEventListener('input', sync);
@@ -897,7 +930,12 @@ function sheetCharge(c) {
       if (f.elements.mode.value === 'inst') {
         const total = parseAmount(fv(f, 'total')), count = parseInt(fv(f, 'count'), 10);
         need(total > 0 && count >= 2, 'Indique le montant total et le nombre de fois (2 minimum).');
-        Object.assign(target, { installment: { total, count }, start: fv(f, 'instStart') || m, end: null, history: [], skips: [], variable: false });
+        const split = echSplit();
+        need(split.rest >= 0, 'Les échéances saisies dépassent le montant total.');
+        need(split.custom ? split.vals.every(v => v >= 0) : true, 'Vérifie le montant des échéances.');
+        const installment = { total, count };
+        if (split.custom) installment.amounts = split.vals;
+        Object.assign(target, { installment, start: fv(f, 'instStart') || m, end: null, history: [], skips: [], variable: false });
       } else {
         const amount = parseAmount(fv(f, 'amount'));
         need(amount > 0, 'Indique le montant.');

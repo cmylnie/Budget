@@ -197,3 +197,17 @@ test('un prélèvement du 25 tombe avant la paie estimée (entre le 25 et le 30)
   // celui du 25 septembre, avant le solde de départ, n'est pas recompté
   assert.equal(M.accountBalance(s, '2026-09-29'), 2800);
 });
+
+test('paiement en plusieurs fois aux montants inégaux (première échéance déjà payée avant le départ)', () => {
+  const { s } = base(); // solde de départ au 29 sept.
+  const c = { id: 'avion', label: 'Billets avion', familyId: 'voyages', kind: 'fixe', day: 5, start: '2026-09', skips: [], history: [],
+    installment: { total: 669, count: 4, amounts: [188.93, 171.62, 154.22, 154.23] } };
+  s.charges.push(c);
+  assert.equal(M.chargeAmountForMonth(c, '2026-10'), 171.62);
+  assert.equal(M.chargeAmountForMonth(c, '2026-12'), 154.23);
+  assert.equal(M.chargeAmountForMonth(c, '2027-01'), 0);
+  // l'échéance de septembre est déjà dans le solde de départ
+  assert.equal(M.accountBalance(s, '2026-09-30'), 2800);
+  const d = M.dashboard(s, '2026-10-01');
+  assert.ok(d.upcoming.some(o => o.charge.id === 'avion' && o.amount === 171.62));
+});
