@@ -3,7 +3,7 @@ import * as A from './actions.js';
 import * as S from './store.js';
 import { todayISO, ym, addDays, addMonthsYM, labelDay, labelDayLong, labelMonth, MOIS, MOIS_COURT, daysInMonth } from './dates.js';
 
-const APP_VERSION = '2.4.2';
+const APP_VERSION = '2.5.0';
 
 let state = S.load();
 let view = 'accueil';
@@ -833,7 +833,7 @@ function sheetCharge(c) {
   const next12 = A.monthsAhead(m, 12);
   openSheet(`<form><h2>${isNew ? 'Nouveau prélèvement' : 'Modifier le prélèvement'}</h2>
     <div class="field"><label>Nom</label><input name="label" value="${esc(data.label)}" placeholder="Ex : box internet, assurance auto…"></div>
-    <div class="field"><label>Famille</label><select name="familyId">${data.familyId || data.kind === 'epargne' ? '' : '<option value="">— Choisir —</option>'}<option value="__epargne" ${data.kind === 'epargne' ? 'selected' : ''}>◎ Épargne (virement vers un livret)</option>${familyOptions(data.kind === 'epargne' ? '' : data.familyId)}</select><p class="hint">Sert à l’analyse : abonnements, assurances, crédits, logement… L'épargne n'est pas comptée comme une dépense.</p></div>
+    <div class="field"><label>Famille</label><select name="familyId">${data.familyId || data.kind === 'epargne' ? '' : '<option value="">— Choisir —</option>'}<option value="__epargne" ${data.kind === 'epargne' ? 'selected' : ''}>◎ Épargne (virement vers un livret)</option>${familyOptions(data.kind === 'epargne' ? '' : data.familyId)}</select><p class="hint">Sert à l’analyse : abonnements, banque (crédits, assurances, frais), logement… L'épargne n'est pas comptée comme une dépense.</p></div>
     <div class="field hide" id="accField"><label>Livret</label><select name="accountId">${accountOptions(data.accountId)}<option value="__new">+ Nouveau livret…</option></select></div>
     <div class="row2 hide" id="newAccField"><div class="field"><label>Nom du livret</label><input name="newAccName" placeholder="Ex : Livret A"></div><div class="field"><label>Solde actuel</label><input name="newAccBal" inputmode="decimal" placeholder="0,00"></div></div>
     <div class="seg"><label><input type="radio" name="mode" value="mensuel" ${inst || variable ? '' : 'checked'}> Fixe</label><label><input type="radio" name="mode" value="variable" ${variable ? 'checked' : ''}> Variable</label><label><input type="radio" name="mode" value="inst" ${inst ? 'checked' : ''}> En plusieurs fois</label></div>

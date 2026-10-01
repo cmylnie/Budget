@@ -59,6 +59,17 @@ function addNewDefaults(s) {
   // v3 : la paie (entre le 25 et le 30) est estimée au plus tard, pour que les prélèvements du 25 au 29
   // soient comptés avant la paie. L'ancienne valeur par défaut (25) est remplacée.
   if (from < 3 && s.settings.paydayEstimateDay === 25) s.settings.paydayEstimateDay = 30;
+  // v4 : « Crédits » devient « Banque » et accueille les assurances (souscrites à la banque).
+  if (from < 4) {
+    const banque = s.families.find(f => f.id === 'credits');
+    if (banque && banque.name === 'Crédits') banque.name = 'Banque';
+    const assur = s.families.find(f => f.id === 'assurances');
+    if (banque && assur) {
+      for (const c of s.charges) if (c.familyId === 'assurances') c.familyId = 'credits';
+      for (const c of s.categories) if (c.familyId === 'assurances') c.familyId = 'credits';
+      s.families = s.families.filter(f => f.id !== 'assurances');
+    }
+  }
   s.settings.defaultsVersion = DEFAULTS_VERSION;
 }
 

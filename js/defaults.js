@@ -5,7 +5,7 @@ export const APP_ID = 'mes-enveloppes';
 export const SCHEMA_VERSION = 1;
 // Incrémenté quand on ajoute des familles/catégories par défaut : elles sont alors ajoutées une fois
 // aux données existantes (voir store.normalize), sans recréer celles que l'utilisatrice a supprimées avant.
-export const DEFAULTS_VERSION = 3;
+export const DEFAULTS_VERSION = 4;
 
 export const DEFAULT_FAMILIES = [
   { id: 'alimentation', name: 'Alimentation', icon: '🛒' },
@@ -18,9 +18,8 @@ export const DEFAULT_FAMILIES = [
   { id: 'cadeaux', name: 'Cadeaux', icon: '🎁' },
   { id: 'voyages', name: 'Voyages', icon: '✈️', since: 2 },
   { id: 'logement', name: 'Logement & foyer', icon: '🏡' },
-  { id: 'assurances', name: 'Assurances', icon: '🛡️' },
   { id: 'abonnements', name: 'Abonnements', icon: '📱' },
-  { id: 'credits', name: 'Crédits', icon: '🏦' },
+  { id: 'credits', name: 'Banque', icon: '🏦' }, // id historique : crédits, frais bancaires, assurances
   { id: 'divers', name: 'Divers', icon: '✳️' },
 ];
 
@@ -59,6 +58,9 @@ export const DEFAULT_CATEGORIES = [
   cat('hebergement', 'Hébergement', 'voyages', 'plaisirs', 2),
   cat('location-voiture', 'Location de voiture', 'voyages', 'plaisirs', 2),
   cat('visites', 'Visites & activités', 'voyages', 'plaisirs', 2),
+  cat('credit', 'Crédit', 'credits', 'quotidien', 4),
+  cat('frais-bancaires', 'Frais bancaires', 'credits', 'quotidien', 4),
+  cat('assurances', 'Assurances', 'credits', 'quotidien', 4),
   cat('autre', 'Autre', 'divers', 'quotidien'),
 ];
 
