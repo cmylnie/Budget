@@ -41,3 +41,21 @@ test('« Crédits » devient « Banque » et absorbe les assurances', () => {
   assert.deepEqual(s.charges.map(c => c.familyId), ['credits', 'credits']);
   assert.deepEqual(s.categories.filter(c => c.familyId === 'credits').map(c => c.name), ['Crédit', 'Frais bancaires', 'Assurances']);
 });
+
+test('Banque déjà renommée et catégories ajoutées à la main : pas de doublon', () => {
+  const old = emptyState();
+  old.settings.defaultsVersion = 3;
+  old.families.find(f => f.id === 'credits').name = 'Banque';
+  old.families.push({ id: 'assurances', name: 'Assurances', icon: '🛡️' });
+  old.categories = old.categories.filter(c => c.familyId !== 'credits');
+  old.categories.push(
+    { id: 'u1', name: 'Assurances', familyId: 'credits', envelope: 'quotidien' },
+    { id: 'u2', name: 'Crédits', familyId: 'credits', envelope: 'quotidien' },
+    { id: 'u3', name: 'Frais bancaire', familyId: 'credits', envelope: 'quotidien' },
+  );
+  old.charges.push({ id: 'a', label: 'Assurance auto', familyId: 'assurances' });
+  const s = normalize(old);
+  assert.deepEqual(s.categories.filter(c => c.familyId === 'credits').map(c => c.id), ['u1', 'u2', 'u3']);
+  assert.ok(!s.families.some(f => f.id === 'assurances'));
+  assert.equal(s.charges[0].familyId, 'credits');
+});

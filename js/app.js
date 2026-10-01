@@ -3,7 +3,7 @@ import * as A from './actions.js';
 import * as S from './store.js';
 import { todayISO, ym, addDays, addMonthsYM, labelDay, labelDayLong, labelMonth, MOIS, MOIS_COURT, daysInMonth } from './dates.js';
 
-const APP_VERSION = '2.5.0';
+const APP_VERSION = '2.6.0';
 
 let state = S.load();
 let view = 'accueil';
@@ -124,7 +124,11 @@ function bindDateChips(root) {
 }
 
 const accountOptions = selected => state.accounts.map(a => `<option value="${a.id}" ${a.id === selected ? 'selected' : ''}>${esc(a.name)}</option>`).join('');
-const familyOptions = selected => state.families.map(f => `<option value="${f.id}" ${f.id === selected ? 'selected' : ''}>${f.icon} ${esc(f.name)}</option>`).join('');
+// Ordre d'affichage : alphabétique, « Divers » toujours en dernier.
+const byName = (a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+const sortedFamilies = () => [...state.families].sort((a, b) => (a.id === 'divers') - (b.id === 'divers') || byName(a, b));
+const catsOf = famId => state.categories.filter(c => c.familyId === famId).sort(byName);
+const familyOptions = selected => sortedFamilies().map(f => `<option value="${f.id}" ${f.id === selected ? 'selected' : ''}>${f.icon} ${esc(f.name)}</option>`).join('');
 const monthOptions = selected => MOIS.map((m, i) => `<option value="${i + 1}" ${i + 1 === selected ? 'selected' : ''}>${m}</option>`).join('');
 const defaultAccountId = () => (state.accounts.find(a => /casden/i.test(a.name)) || state.accounts[0] || {}).id || null;
 
@@ -548,8 +552,8 @@ function viewReglages() {
     <button class="btn btn-secondary">Enregistrer les montants</button></form></div></div>`;
 
   h += `<p class="section-title">Catégories de dépenses<span><button class="link" data-act="family">+ Famille</button> · <button class="link" data-act="category">+ Catégorie</button></span></p><div class="section"><div class="card">`;
-  for (const f of state.families) {
-    const cats = state.categories.filter(c => c.familyId === f.id);
+  for (const f of sortedFamilies()) {
+    const cats = catsOf(f.id);
     h += `<div class="bar-row" style="cursor:default;padding:6px 0"><div class="bar-head"><span class="n">${f.icon} ${esc(f.name)}</span><button class="link" data-act="family" data-id="${f.id}">Modifier</button></div>
       <div class="chips" style="padding:6px 0 0">${cats.map(c => `<button class="chip" data-act="category" data-id="${c.id}">${esc(c.name)} <span class="muted small">· ${envName(c.envelope)}</span></button>`).join('') || '<span class="small muted">Aucune catégorie (utilisée pour les prélèvements)</span>'}</div></div>`;
   }
@@ -615,8 +619,8 @@ function categoryChips(selected) {
   const chip = c => `<button type="button" class="chip ${c.id === selected ? 'on' : ''}" data-cat="${c.id}">${esc(c.name)}</button>`;
   let h = '<div class="cat-grid">';
   if (frequent.length) h += `<p class="fam">Fréquentes</p><div class="chips">${frequent.map(chip).join('')}</div>`;
-  for (const f of state.families) {
-    const cats = state.categories.filter(c => c.familyId === f.id);
+  for (const f of sortedFamilies()) {
+    const cats = catsOf(f.id);
     if (cats.length) h += `<p class="fam">${f.icon} ${esc(f.name)}</p><div class="chips">${cats.map(chip).join('')}</div>`;
   }
   return h + '</div>';
@@ -1135,7 +1139,7 @@ function sheetUseProject(p) {
     <p class="intro">${eur(saved)} de côté pour ce projet.</p>
     <div class="field amount"><input name="amount" inputmode="decimal" value="${amountValue(saved)}" aria-label="Montant"></div>
     <div class="field"><label>Pour quoi ?</label><input name="label" placeholder="Ex : cadeau, réparation…"></div>
-    <div class="field"><label>Catégorie</label><select name="categoryId">${state.families.map(f => { const cs = cats.filter(c => c.familyId === f.id); return cs.length ? `<optgroup label="${esc(f.name)}">${cs.map(c => `<option value="${c.id}" ${c.id === defCat ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>` : ''; }).join('')}</select></div>
+    <div class="field"><label>Catégorie</label><select name="categoryId">${sortedFamilies().map(f => { const cs = catsOf(f.id); return cs.length ? `<optgroup label="${esc(f.name)}">${cs.map(c => `<option value="${c.id}" ${c.id === defCat ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>` : ''; }).join('')}</select></div>
     ${dateField('date', T())}
     <label class="check"><input type="checkbox" name="bringBack" checked> Je rapatrie cet argent du livret vers mon compte</label>
     <label class="check"><input type="checkbox" name="record" checked> Enregistrer la dépense (hors enveloppes Quotidien et Plaisirs)</label>
@@ -1201,7 +1205,7 @@ ACTIONS.delfamily = id => { closeSheet(); withUndo('Famille supprimée.', () => 
 
 function sheetCategory(c) {
   const isNew = !c;
-  const data = c || { name: '', familyId: state.families[0].id, envelope: 'quotidien' };
+  const data = c || { name: '', familyId: sortedFamilies()[0].id, envelope: 'quotidien' };
   const uses = c ? state.expenses.filter(e => e.categoryId === c.id).length : 0;
   openSheet(`<form><h2>${isNew ? 'Nouvelle catégorie' : 'Modifier la catégorie'}</h2>
     <div class="field"><label>Nom</label><input name="name" value="${esc(data.name)}"></div>
@@ -1380,7 +1384,18 @@ ACTIONS.wizaddacc = () => { wizardCollect($('#wizForm')); wiz.accounts.push({ na
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; if (view === 'reglages') render(); });
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-  navigator.serviceWorker.register('sw.js').catch(() => { /* hors ligne ou non supporté : l'appli marche quand même */ });
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    // L'appli installée reste souvent ouverte en arrière-plan : on cherche une mise à jour à chaque retour.
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+  }).catch(() => { /* hors ligne ou non supporté : l'appli marche quand même */ });
+  // Nouvelle version installée : on recharge une fois pour l'utiliser (sauf si une saisie est en cours).
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading || !navigator.serviceWorker.controller) return;
+    reloading = true;
+    if (sheetOpen) toast('Nouvelle version disponible : elle sera utilisée à la prochaine ouverture.');
+    else location.reload();
+  });
 }
 
 // Au retour sur l'appli (le lendemain par exemple), on recalcule avec la date du jour.

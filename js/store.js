@@ -53,9 +53,6 @@ function addNewDefaults(s) {
       s.families.splice(at >= 0 ? at + 1 : s.families.length, 0, f);
     }
   }
-  for (const { since, ...c } of DEFAULT_CATEGORIES) {
-    if (since > from && !s.categories.some(x => x.id === c.id)) s.categories.push(c);
-  }
   // v3 : la paie (entre le 25 et le 30) est estimée au plus tard, pour que les prélèvements du 25 au 29
   // soient comptés avant la paie. L'ancienne valeur par défaut (25) est remplacée.
   if (from < 3 && s.settings.paydayEstimateDay === 25) s.settings.paydayEstimateDay = 30;
@@ -69,6 +66,14 @@ function addNewDefaults(s) {
       for (const c of s.categories) if (c.familyId === 'assurances') c.familyId = 'credits';
       s.families = s.families.filter(f => f.id !== 'assurances');
     }
+  }
+  // Nouvelles catégories, après les fusions de familles ci-dessus. Une catégorie déjà créée à la main
+  // sous un nom voisin (« Crédits » pour « Crédit », « Frais bancaire »…) n'est pas ajoutée une 2ᵉ fois.
+  const key = n => n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, '').replace(/s/g, '');
+  for (const { since, ...c } of DEFAULT_CATEGORIES) {
+    if (!(since > from) || s.categories.some(x => x.id === c.id)) continue;
+    if (s.categories.some(x => x.familyId === c.familyId && key(x.name) === key(c.name))) continue;
+    s.categories.push(c);
   }
   s.settings.defaultsVersion = DEFAULTS_VERSION;
 }

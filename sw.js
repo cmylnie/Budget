@@ -1,7 +1,7 @@
 // Service worker : l'appli s'ouvre même sans réseau.
 // Stratégie « réseau d'abord » : dès qu'il y a du réseau, on récupère la dernière version
 // (les mises à jour arrivent toutes seules), sinon on sert la copie gardée en cache.
-const CACHE = 'mes-enveloppes-v9';
+const CACHE = 'mes-enveloppes-v10';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/app.js', 'js/model.js', 'js/actions.js', 'js/store.js', 'js/dates.js', 'js/defaults.js',
@@ -24,7 +24,9 @@ self.addEventListener('fetch', event => {
   const req = event.request;
   if (req.method !== 'GET') return;
   event.respondWith(
-    fetch(req)
+    // no-cache : on redemande au serveur s'il y a plus récent (le cache HTTP de GitHub Pages garde
+    // sinon les fichiers 10 minutes et la mise à jour semble ne pas arriver).
+    fetch(req, new URL(req.url).origin === self.location.origin ? { cache: 'no-cache' } : {})
       .then(res => {
         if (res && (res.ok || res.type === 'opaque')) {
           const copy = res.clone();
