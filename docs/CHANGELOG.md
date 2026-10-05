@@ -1,5 +1,8 @@
 # Journal des versions
 
+## 2.6.1
+- Réglages : aide du jour de paie formulée pour tout le monde (l'appli peut servir à une autre personne).
+
 ## 2.6.0
 - Familles par ordre alphabétique (Divers en dernier), catégories triées dans chaque famille.
 - Mises à jour appliquées sans attendre : l'appli vérifie à chaque retour et se recharge seule.

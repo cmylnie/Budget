@@ -2,7 +2,7 @@
 
 Refonte complète de la v1 (fichier HTML unique ouvert depuis le gestionnaire de fichiers, données
 perdues à chaque nouvelle version). Ce document décrit le modèle et les règles ; le code fait foi.
-Version de l'appli : `APP_VERSION` dans `js/app.js` (2.6.0 à la date de ce document).
+Version de l'appli : `APP_VERSION` dans `js/app.js` (2.6.1 à la date de ce document).
 
 ## 1. Architecture
 

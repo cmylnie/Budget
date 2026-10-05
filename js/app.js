@@ -3,7 +3,7 @@ import * as A from './actions.js';
 import * as S from './store.js';
 import { todayISO, ym, addDays, addMonthsYM, labelDay, labelDayLong, labelMonth, MOIS, MOIS_COURT, daysInMonth } from './dates.js';
 
-const APP_VERSION = '2.6.0';
+const APP_VERSION = '2.6.1';
 
 let state = S.load();
 let view = 'accueil';
@@ -537,7 +537,7 @@ function viewReglages() {
     </form>
     ${state.settings.salaryHistory.length > 1 ? `<div class="list" style="margin-top:8px">${[...state.settings.salaryHistory].reverse().map(x => `<div class="item" style="cursor:default"><div class="main"><p class="s">Depuis ${labelMonth(x.from)}</p></div><span class="amt">${eur(x.amount)}</span></div>`).join('')}</div>` : ''}
     <div class="field" style="margin-top:16px"><label>Jour estimé de la paie</label><input type="number" id="payDay" min="1" max="31" value="${state.settings.paydayEstimateDay}">
-    <p class="hint">Ta paie arrive entre le 25 et le 30 : garde le 30 pour être prudente (les prélèvements jusqu'au 29 sont comptés avant la paie). Le vrai cycle commence le jour où tu enregistres ta paie.</p></div>
+    <p class="hint">Indique le jour où ta paie arrive au plus tard (par exemple le 30 si elle tombe entre le 25 et le 30). Par prudence, les prélèvements d'avant ce jour sont comptés avant la paie. Le vrai cycle commence le jour où tu enregistres ta paie.</p></div>
   </div></div>`;
 
   h += `<p class="section-title">Extras prévus sur la paie<button class="link" data-act="extra">+ Ajouter</button></p><div class="section"><div class="card">
