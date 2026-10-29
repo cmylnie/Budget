@@ -71,7 +71,7 @@ export function setClosure(state, cycle, choices) {
   info.closure = {};
   const next = cycles(state)[cycle.index + 1];
   for (const env of ENVELOPES) {
-    const ch = choices[env] || { action: 'report' };
+    const ch = choices[env] || { action: 'compte' };
     const entry = { action: ch.action };
     if (ch.action === 'livret' && ch.accountId) {
       const left = envelopeStatus(state, cycle, env).left;

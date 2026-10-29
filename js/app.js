@@ -3,7 +3,7 @@ import * as A from './actions.js';
 import * as S from './store.js';
 import { todayISO, ym, addDays, addMonthsYM, labelDay, labelDayLong, labelMonth, MOIS, MOIS_COURT, daysInMonth } from './dates.js';
 
-const APP_VERSION = '2.6.1';
+const APP_VERSION = '2.7.0';
 
 let state = S.load();
 let view = 'accueil';
@@ -56,9 +56,9 @@ function withUndo(message, mutate) {
 }
 
 let toastTimer = null;
-function toast(message, undo) {
+function toast(message, undo, label = 'Annuler') {
   const el = $('#toast');
-  el.innerHTML = `<span>${esc(message)}</span>${undo ? '<button type="button">Annuler</button>' : ''}`;
+  el.innerHTML = `<span>${esc(message)}</span>${undo ? `<button type="button">${esc(label)}</button>` : ''}`;
   el.classList.remove('hide');
   if (undo) el.querySelector('button').onclick = () => { el.classList.add('hide'); undo(); };
   clearTimeout(toastTimer);
@@ -325,10 +325,10 @@ function movementItem(m) {
     <span class="amt ${vers ? '' : 'pos'}">${vers ? '−' : '+'}${eur(m.amount)}</span></div>`;
 }
 
-const CLOSURE_LABEL = { report: 'reporté', livret: 'mis sur le livret', compte: 'laissé sur le compte' };
+const CLOSURE_LABEL = { report: 'reporté', livret: 'mis sur le livret', compte: 'remis à zéro (reste sur le compte)' };
 function closureSummary(c) {
   const parts = A.leftovers(state, c).map(({ env, left }) => {
-    const info = ((state.cycles[c.id] || {}).closure || {})[env] || { action: 'report' };
+    const info = ((state.cycles[c.id] || {}).closure || {})[env] || { action: 'compte' };
     const acc = info.accountId && accById(info.accountId);
     const act = left === 0 ? 'soldé' : left < 0 && info.action === 'report' ? 'déduit du cycle suivant' : info.action === 'livret' && acc ? 'mis sur ' + esc(acc.name) : CLOSURE_LABEL[info.action];
     return `<div class="row"><span>${envName(env)} : <b class="${left < 0 ? 'neg' : ''}">${signed(left)}</b></span><span class="muted">${act}</span></div>`;
@@ -343,7 +343,7 @@ ACTIONS.jfilter = k => { journalFilter = k; render(); };
 ACTIONS.editpaie = id => sheetPaie(state.paies.find(p => p.id === id));
 ACTIONS.income = id => sheetIncome(id ? state.incomes.find(i => i.id === id) : null);
 ACTIONS.movement = id => sheetMovement(state.movements.find(m => m.id === id));
-ACTIONS.closure = id => sheetClosure(M.cycles(state).find(c => c.id === id), false);
+ACTIONS.closure = id => sheetClosure(M.cycles(state).find(c => c.id === id));
 
 /* ================= Analyse ================= */
 
@@ -707,7 +707,7 @@ function sheetPaie(p) {
   const exp = M.expectedSalary(state, ym(date));
   const isFirst = p && M.cycles(state)[0].id === p.id;
   openSheet(`<form><h2>${isNew ? 'Ma paie est arrivée' : 'Modifier la paie'}</h2>
-    ${isNew ? '<p class="intro">Un nouveau cycle commence : tes enveloppes repartent à zéro (avec le report éventuel).</p>' : ''}
+    ${isNew ? '<p class="intro">Un nouveau cycle commence : tes enveloppes repartent à zéro.</p>' : ''}
     <div class="field amount"><input name="amount" inputmode="decimal" value="${amountValue(p ? p.amount : exp.total)}" aria-label="Montant reçu"></div>
     <p class="hint small muted" style="margin:-8px 0 14px;text-align:center">Prévu : ${eur(exp.base)} de base${exp.extras.map(x => ' + ' + esc(x.label) + ' ' + eur(x.amount)).join('')}. Corrige avec le montant exact reçu.</p>
     ${dateField('date', date, 'Arrivée sur le compte le')}
@@ -730,40 +730,41 @@ function sheetPaie(p) {
       const np = A.addPaie(state, { date: d, amount, note: fv(f, 'note') });
       S.save(state);
       const prev = A.previousCycle(state, np.id);
-      if (prev && A.leftovers(state, prev).some(x => x.left !== 0)) { sheetClosure(prev, true); render(); }
-      else { closeSheet(); commit(); toast('Paie enregistrée : nouveau cycle !'); }
+      closeSheet(); commit();
+      // Les enveloppes repartent à zéro d'elles-mêmes ; reporter le reste reste possible, au choix.
+      if (prev && A.leftovers(state, prev).some(x => x.left > 0)) toast('Paie enregistrée : tes enveloppes repartent à zéro.', () => sheetClosure(prev), 'Reporter le reste ?');
+      else toast('Paie enregistrée : tes enveloppes repartent à zéro.');
     });
   });
 }
 ACTIONS.delpaie = id => { closeSheet(); withUndo('Paie supprimée.', () => A.deletePaie(state, id)); };
 
-function sheetClosure(c, afterPaie) {
+function sheetClosure(c) {
   const lefts = A.leftovers(state, c);
   const closure = (state.cycles[c.id] || {}).closure || {};
   const hasAcc = state.accounts.length > 0;
   const blocks = lefts.map(({ env, left }) => {
-    const cur = closure[env] || { action: 'report' };
+    const cur = closure[env] || { action: 'compte' };
     if (left === 0) return `<div class="card" style="margin-bottom:10px"><b>${envName(env)}</b> · <span class="muted">tout a été dépensé, pile !</span></div>`;
     const opts = left > 0
-      ? [['report', 'Reporter'], ...(hasAcc ? [['livret', 'Sur un livret']] : []), ['compte', 'Laisser']]
-      : [['report', 'Déduire du prochain'], ['compte', 'Ne pas reporter']];
+      ? [['compte', 'Remettre à zéro'], ['report', 'Reporter'], ...(hasAcc ? [['livret', 'Sur un livret']] : [])]
+      : [['compte', 'Remettre à zéro'], ['report', 'Déduire du prochain']];
     return `<div class="card" style="margin-bottom:10px"><div class="env-top"><b>${envName(env)}</b><span class="env-left ${left < 0 ? 'neg' : 'pos'}">${signed(left)}</span></div>
       <div class="seg" style="margin:10px 0 0">${opts.map(([k, l]) => `<label><input type="radio" name="${env}" value="${k}" ${cur.action === k ? 'checked' : ''}> ${l}</label>`).join('')}</div>
       ${left > 0 && hasAcc ? `<div class="field ${cur.action === 'livret' ? '' : 'hide'}" data-accfor="${env}" style="margin:10px 0 0"><select name="${env}Acc">${accountOptions(cur.accountId || defaultAccountId())}</select></div>` : ''}</div>`;
   }).join('');
-  openSheet(`<form><h2>${afterPaie ? 'Nouveau cycle 🎉' : 'Reste en fin de cycle'}</h2>
-    <p class="intro">${afterPaie ? 'Paie enregistrée. ' : ''}Que faire de ce qui reste dans tes enveloppes du cycle ${cycleLabel(c).toLowerCase()} ?<br><b>Reporter</b> l'ajoute au budget du nouveau cycle, <b>Laisser</b> le garde simplement sur ton compte.</p>
-    ${blocks}${buttons('Valider', afterPaie ? '<button type="button" class="btn btn-secondary" data-cancel>Plus tard (reporter)</button>' : '')}</form>`, root => {
+  openSheet(`<form><h2>Reste en fin de cycle</h2>
+    <p class="intro">Ce qui restait dans tes enveloppes du cycle ${cycleLabel(c).toLowerCase()}.<br><b>Remettre à zéro</b> : le nouveau cycle repart avec son budget habituel, le reste est simplement sur ton compte. <b>Reporter</b> : le reste s'ajoute au budget du nouveau cycle.</p>
+    ${blocks}${buttons('Valider')}</form>`, root => {
     const form = root.querySelector('form');
     form.querySelectorAll('input[type="radio"]').forEach(r => {
       r.onchange = () => { const box = root.querySelector(`[data-accfor="${r.name}"]`); if (box) box.classList.toggle('hide', r.value !== 'livret'); };
     });
-    form.querySelector('[data-cancel]').onclick = () => { closeSheet(); commit(); };
     bindForm(root, f => {
       const choices = {};
       for (const { env } of lefts) {
         const r = f.elements[env];
-        choices[env] = r ? { action: r.value, accountId: f.elements[env + 'Acc'] ? f.elements[env + 'Acc'].value : null } : { action: 'report' };
+        choices[env] = r ? { action: r.value, accountId: f.elements[env + 'Acc'] ? f.elements[env + 'Acc'].value : null } : { action: 'compte' };
       }
       A.setClosure(state, c, choices);
       closeSheet(); commit(); toast('C’est noté !');
@@ -994,7 +995,7 @@ function sheetMovement(mv, preset = {}) {
   if (mv && mv.kind === 'cloture') {
     const cid = Object.keys(state.cycles).find(k => Object.values((state.cycles[k] || {}).closure || {}).some(x => x.movementId === mv.id));
     const c = M.cycles(state).find(x => x.id === cid);
-    if (c) return sheetClosure(c, false);
+    if (c) return sheetClosure(c);
   }
   const isNew = !mv;
   const data = mv || { direction: 'vers', accountId: preset.accountId || defaultAccountId(), amount: null, date: T(), label: '', projectId: null };

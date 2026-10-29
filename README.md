@@ -26,8 +26,9 @@ Adresse de l'appli : **https://cmylnie.github.io/Budget/** (attention au **B** m
   le calcul pas à pas : sur le compte − prélèvements à venir − reste des enveloppes = **ce qu'il te
   restera avant la paie**.
 - **Deux enveloppes** : *Quotidien* (courses, carburant, péages, pharmacie, coiffeur…) et *Plaisirs*
-  (restos, sorties, shopping, loisirs…). À chaque paie, le reste est reporté, mis sur un livret ou laissé
-  sur le compte, au choix.
+  (restos, sorties, shopping, loisirs…). À chaque paie, elles **repartent à zéro** avec leur budget
+  habituel ; si tu veux, le reste peut être reporté sur le nouveau cycle ou mis sur un livret (bouton
+  « Reporter le reste ? » juste après la paie, ou Journal → cycle précédent → Modifier).
 - **Les projets** (mariage, Noël, voiture…) ont un montant à atteindre ; leur argent est rangé sur un
   livret. Les dépenses payées avec ne touchent pas les enveloppes.
 - **Rien ne réécrit le passé** : un changement de tarif, d'enveloppe ou de salaire s'applique à partir

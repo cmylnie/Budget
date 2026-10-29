@@ -1,5 +1,10 @@
 # Journal des versions
 
+## 2.7.0
+- À chaque paie, les enveloppes **repartent à zéro** toutes seules. Reporter le reste devient un choix
+  (« Reporter le reste ? » juste après la paie, ou depuis le Journal).
+- Les reports enregistrés jusqu'ici par défaut sont remis à zéro une fois.
+
 ## 2.6.1
 - Réglages : aide du jour de paie formulée pour tout le monde (l'appli peut servir à une autre personne).
 

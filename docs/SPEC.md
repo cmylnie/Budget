@@ -2,7 +2,7 @@
 
 Refonte complète de la v1 (fichier HTML unique ouvert depuis le gestionnaire de fichiers, données
 perdues à chaque nouvelle version). Ce document décrit le modèle et les règles ; le code fait foi.
-Version de l'appli : `APP_VERSION` dans `js/app.js` (2.6.1 à la date de ce document).
+Version de l'appli : `APP_VERSION` dans `js/app.js` (2.7.0 à la date de ce document).
 
 ## 1. Architecture
 
@@ -80,9 +80,10 @@ stockée en `kind: 'epargne'` et n'entre pas dans l'analyse des dépenses.
   jour : saisi après le recalage). Le solde de départ est le premier recalage : ce qui est daté avant
   (une échéance déjà payée, un prélèvement du début du mois) n'est jamais recompté.
 - **Reste à dépenser** = somme des restes positifs des enveloppes Quotidien et Plaisirs du cycle.
-- **Enveloppe** : budget = budget du cycle (sinon budget habituel) + report du cycle précédent.
-  En fin de cycle, le reste est *reporté* (par défaut, dépassement compris), *mis sur un livret*
-  (un mouvement est créé) ou *laissé sur le compte*.
+- **Enveloppe** : budget = budget du cycle (sinon budget habituel) + report éventuel du cycle précédent.
+  À la paie suivante, l'enveloppe **repart à zéro** par défaut (`closure` absente ou `'compte'` : le reste
+  reste simplement sur le compte). Sur demande, le reste est *reporté* (`'report'`, dépassement compris)
+  ou *mis sur un livret* (`'livret'`, un mouvement est créé).
 - **Accueil, calcul pas à pas** : sur le compte − prélèvements d'ici la paie estimée − reste à dépenser
   = **ce qu'il restera avant la paie** (négatif : alerte).
 - **Prélèvements** :
@@ -113,6 +114,7 @@ appliquées **une seule fois** grâce à `settings.defaultsVersion` (`DEFAULTS_V
 | 2 | Famille *Voyages* (billets, hébergement, location de voiture, visites) |
 | 3 | Jour estimé de la paie : 25 → 30 (seulement si la valeur était encore 25) |
 | 4 | *Crédits* renommée *Banque* (si pas déjà renommée) ; *Assurances* fusionnée dans Banque (prélèvements et catégories déplacés) ; catégories Crédit, Frais bancaires, Assurances (sauf si une catégorie au nom voisin existe déjà dans la famille) |
+| 5 | Enveloppes à zéro à chaque paie : les reports enregistrés (validés quand le report était proposé par défaut) passent à « remettre à zéro » |
 
 Pour une nouvelle migration : incrémenter `DEFAULTS_VERSION`, marquer les nouveaux éléments par défaut
 avec `since`, ajouter le traitement dans `addNewDefaults()` et un test dans `tests/store.test.js`.

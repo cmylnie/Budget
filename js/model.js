@@ -247,7 +247,8 @@ export function envelopeStatus(state, cycle, env) {
     const budget = r2(base + carry);
     const spent = sum(expensesIn(state, c.start, c.end, e => e.envelope === env), e => e.amount);
     const left = r2(budget - spent);
-    const action = (info.closure && info.closure[env] && info.closure[env].action) || 'report';
+    // Par défaut l'enveloppe repart à zéro à la paie suivante ; le reste n'est reporté que si on le demande.
+    const action = (info.closure && info.closure[env] && info.closure[env].action) || 'compte';
     res = { base, carry, budget, spent, left, overridden: override != null, action };
     carry = action === 'report' ? left : 0;
   }

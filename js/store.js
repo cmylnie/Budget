@@ -67,6 +67,15 @@ function addNewDefaults(s) {
       s.families = s.families.filter(f => f.id !== 'assurances');
     }
   }
+  // v5 : les enveloppes repartent à zéro à chaque paie. Le report, proposé jusque-là par défaut, avait été
+  // validé sans le vouloir : il est retiré une fois ; on peut toujours le redemander depuis le Journal.
+  if (from < 5) {
+    for (const info of Object.values(s.cycles || {})) {
+      for (const env of Object.keys((info && info.closure) || {})) {
+        if (info.closure[env].action === 'report') info.closure[env].action = 'compte';
+      }
+    }
+  }
   // Nouvelles catégories, après les fusions de familles ci-dessus. Une catégorie déjà créée à la main
   // sous un nom voisin (« Crédits » pour « Crédit », « Frais bancaire »…) n'est pas ajoutée une 2ᵉ fois.
   const key = n => n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, '').replace(/s/g, '');

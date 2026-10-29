@@ -59,3 +59,15 @@ test('Banque déjà renommée et catégories ajoutées à la main : pas de doubl
   assert.ok(!s.families.some(f => f.id === 'assurances'));
   assert.equal(s.charges[0].familyId, 'credits');
 });
+
+test('report validé auparavant par défaut : retiré une fois (enveloppes à zéro)', () => {
+  const old = emptyState();
+  old.settings.defaultsVersion = 4;
+  old.cycles = { p1: { closure: { quotidien: { action: 'report' }, plaisirs: { action: 'livret', accountId: 'a', movementId: 'm' } } } };
+  const s = normalize(old);
+  assert.equal(s.cycles.p1.closure.quotidien.action, 'compte');
+  assert.equal(s.cycles.p1.closure.plaisirs.action, 'livret');
+  // un report choisi ensuite est conservé
+  s.cycles.p1.closure.quotidien.action = 'report';
+  assert.equal(normalize(s).cycles.p1.closure.quotidien.action, 'report');
+});

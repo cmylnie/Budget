@@ -60,18 +60,21 @@ test('paie en retard : plus de « 1 jour » bloqué, la paie est signalée comme
   assert.equal(d.daysLeft, 0);
 });
 
-test('nouvelle paie : nouveau cycle et report du reste des enveloppes', () => {
+test('nouvelle paie : les enveloppes repartent à zéro, report seulement sur demande', () => {
   const { s } = base();
   exp(s, '2026-10-02', 250, 'quotidien');
   exp(s, '2026-10-03', 120, 'plaisirs');
+  exp(s, '2026-10-27', 15, 'quotidien'); // première dépense du nouveau cycle
   const p = A.addPaie(s, { date: '2026-10-26', amount: 2452.04 });
   const cur = M.currentCycle(s, '2026-10-27');
   assert.equal(cur.id, p.id);
   const q = M.envelopeStatus(s, cur, 'quotidien');
-  assert.equal(q.carry, 50);
-  assert.equal(q.budget, 350);
-  const pl = M.envelopeStatus(s, cur, 'plaisirs');
-  assert.equal(pl.carry, -20); // dépassement déduit du cycle suivant
+  assert.deepEqual([q.carry, q.budget, q.spent, q.left], [0, 300, 15, 285]);
+  assert.equal(M.envelopeStatus(s, cur, 'plaisirs').budget, 100); // dépassement non déduit
+  // reporter le reste, si on le choisit
+  A.setClosure(s, A.previousCycle(s, p.id), { quotidien: { action: 'report' }, plaisirs: { action: 'report' } });
+  assert.equal(M.envelopeStatus(s, cur, 'quotidien').budget, 350);
+  assert.equal(M.envelopeStatus(s, cur, 'plaisirs').carry, -20);
 });
 
 test('clôture : reste viré sur un livret ou laissé sur le compte', () => {
