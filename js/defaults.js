@@ -5,7 +5,7 @@ export const APP_ID = 'mes-enveloppes';
 export const SCHEMA_VERSION = 1;
 // Incrémenté quand on ajoute des familles/catégories par défaut : elles sont alors ajoutées une fois
 // aux données existantes (voir store.normalize), sans recréer celles que l'utilisatrice a supprimées avant.
-export const DEFAULTS_VERSION = 5;
+export const DEFAULTS_VERSION = 6;
 
 export const DEFAULT_FAMILIES = [
   { id: 'alimentation', name: 'Alimentation', icon: '🛒' },

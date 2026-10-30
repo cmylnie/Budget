@@ -1,5 +1,12 @@
 # Journal des versions
 
+## 2.8.0
+- Projets : le **coût réel** (dépenses et prélèvements liés) réduit ce qu'il reste à prévoir, au lieu
+  d'augmenter la somme à mettre de côté. Dépasser le budget prévu est affiché comme un simple constat.
+- Un prélèvement peut être **lié à un projet** (ex. billets en 4×) : toutes ses échéances comptent.
+- « Utiliser » devient **Ajouter une dépense**, payée ou non avec l'argent mis de côté.
+- La fiche du projet détaille le coût réel ligne par ligne.
+
 ## 2.7.0
 - À chaque paie, les enveloppes **repartent à zéro** toutes seules. Reporter le reste devient un choix
   (« Reporter le reste ? » juste après la paie, ou depuis le Journal).

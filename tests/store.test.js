@@ -71,3 +71,14 @@ test('report validé auparavant par défaut : retiré une fois (enveloppes à z�
   s.cycles.p1.closure.quotidien.action = 'report';
   assert.equal(normalize(s).cycles.p1.closure.quotidien.action, 'report');
 });
+
+test('ancienne dépense de projet qui réduisait l’argent de côté : écriture retirée, virements gardés', () => {
+  const old = emptyState();
+  old.settings.defaultsVersion = 5;
+  old.projectEntries = [
+    { id: 'e1', projectId: 'p', amount: 200, movementId: 'm1', expenseId: null },
+    { id: 'e2', projectId: 'p', amount: -50, movementId: null, expenseId: 'x' },
+    { id: 'e3', projectId: 'p', amount: -30, movementId: 'm2', expenseId: 'y' },
+  ];
+  assert.deepEqual(normalize(old).projectEntries.map(e => e.id), ['e1', 'e3']);
+});

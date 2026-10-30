@@ -2,7 +2,7 @@
 
 Refonte complète de la v1 (fichier HTML unique ouvert depuis le gestionnaire de fichiers, données
 perdues à chaque nouvelle version). Ce document décrit le modèle et les règles ; le code fait foi.
-Version de l'appli : `APP_VERSION` dans `js/app.js` (2.7.0 à la date de ce document).
+Version de l'appli : `APP_VERSION` dans `js/app.js` (2.8.0 à la date de ce document).
 
 ## 1. Architecture
 
@@ -63,7 +63,8 @@ dans le temps est **datée** : modifier quelque chose n'affecte jamais le passé
   start: 'YYYY-MM', end: 'YYYY-MM' | null, skips: ['YYYY-MM'],
   history: [{ from: 'YYYY-MM', amount }],               // fixe : montant applicable par mois
   variable: true, actuals: { 'YYYY-MM': amount },       // variable : montants réels saisis
-  installment: { total, count, amounts?: [..] } | null  // en plusieurs fois (amounts : échéances inégales)
+  installment: { total, count, amounts?: [..] } | null, // en plusieurs fois (amounts : échéances inégales)
+  projectId                                             // facultatif : compte dans le coût de ce projet
 }
 ```
 
@@ -94,10 +95,13 @@ stockée en `kind: 'epargne'` et n'entre pas dans l'analyse des dépenses.
   - *en plusieurs fois* : `amounts[i]` si saisi, sinon partage égal où le dernier versement absorbe
     l'arrondi ;
   - mois sautés (`skips`) et fin (`end`) ; un virement automatique (`kind:'epargne'`) crédite son livret.
-- **Projets** : l'argent est rangé sur un livret. « Mettre de côté » crée un virement (ou réserve de
-  l'argent déjà présent) ; « Utiliser » le rapatrie et enregistre la dépense en enveloppe `projet`,
-  sans toucher Quotidien ni Plaisirs. Montant à mettre de côté par paie = reste / paies restantes avant
-  l'échéance.
+- **Projets** : `target` est le budget prévu. **Coût réel** (`projectCost`) = dépenses en enveloppe
+  `projet` rattachées au projet + échéances des prélèvements liés (`charge.projectId`) : toutes pour un
+  paiement en plusieurs fois, jusqu'à l'échéance du projet pour un prélèvement mensuel. **Mis de côté**
+  = somme des `projectEntries` (versements +, retours vers le compte −) ; une dépense ne le réduit que si
+  elle est payée avec cet argent (virement livret → compte créé, au plus le montant de côté).
+  **Reste à prévoir** = max(0, budget − coût réel − mis de côté) ; à mettre de côté par paie = reste à
+  prévoir / paies restantes avant l'échéance. Un coût supérieur au budget est affiché sans alerte.
 - **Salaire prévu** d'un mois = salaire de base applicable + extras de ce mois. Il pré-remplit la paie
   et alimente les prévisions à 6 mois.
 - **Affichage** : familles par ordre alphabétique (`Divers` en dernier), catégories triées dans chaque
@@ -115,6 +119,7 @@ appliquées **une seule fois** grâce à `settings.defaultsVersion` (`DEFAULTS_V
 | 3 | Jour estimé de la paie : 25 → 30 (seulement si la valeur était encore 25) |
 | 4 | *Crédits* renommée *Banque* (si pas déjà renommée) ; *Assurances* fusionnée dans Banque (prélèvements et catégories déplacés) ; catégories Crédit, Frais bancaires, Assurances (sauf si une catégorie au nom voisin existe déjà dans la famille) |
 | 5 | Enveloppes à zéro à chaque paie : les reports enregistrés (validés quand le report était proposé par défaut) passent à « remettre à zéro » |
+| 6 | Projets : les écritures qui retiraient une dépense de l'argent mis de côté sans virement réel sont supprimées (la dépense compte désormais dans le coût réel) |
 
 Pour une nouvelle migration : incrémenter `DEFAULTS_VERSION`, marquer les nouveaux éléments par défaut
 avec `since`, ajouter le traitement dans `addNewDefaults()` et un test dans `tests/store.test.js`.

@@ -3,7 +3,7 @@ import * as A from './actions.js';
 import * as S from './store.js';
 import { todayISO, ym, addDays, addMonthsYM, labelDay, labelDayLong, labelMonth, MOIS, MOIS_COURT, daysInMonth } from './dates.js';
 
-const APP_VERSION = '2.7.0';
+const APP_VERSION = '2.8.0';
 
 let state = S.load();
 let view = 'accueil';
@@ -442,7 +442,8 @@ function viewPrelevements() {
     for (const c of active) {
       const st = chargeStatus(c, win);
       const fam = famById(c.familyId);
-      const kind = c.kind === 'epargne' ? `Épargne → ${esc((accById(c.accountId) || {}).name || 'livret')}` : fam ? esc(fam.name) : 'Charge';
+      const proj = c.projectId && projById(c.projectId);
+      const kind = (c.kind === 'epargne' ? `Épargne → ${esc((accById(c.accountId) || {}).name || 'livret')}` : fam ? esc(fam.name) : 'Charge') + (proj ? ` · Projet ${esc(proj.name)}` : '');
       h += `<div class="item ${st.dim ? 'dim' : ''}" data-act="charge" data-id="${c.id}">
         <div class="ico">${c.kind === 'epargne' ? '◎' : fam ? fam.icon : '↧'}</div>
         <div class="main"><p class="t">${esc(c.label)}${c.installment ? '<span class="badge gold">' + c.installment.count + '×</span>' : ''}${c.variable ? '<span class="badge">variable</span>' : ''}</p><p class="s">${kind} · ${st.text}</p></div>
@@ -493,22 +494,24 @@ function viewEpargne() {
   return h;
 }
 
+// Carte projet : un constat, sans vert ni rouge. Dépensé + prélèvements à venir + mis de côté
+// couvrent l'objectif ; au-delà, c'est simplement le coût réel de l'événement.
 function projectCard(p, st) {
   const acc = accById(p.accountId);
   let need;
-  if (st.reached) need = `<p class="need ok">✓ Objectif atteint</p>`;
-  else if (st.overdue) need = `<p class="need bad">Échéance passée · il manquait ${eur(st.remaining)}</p>`;
-  else if (st.perPaie != null) need = `<p class="need">≈ ${eur(st.perPaie)} à mettre de côté à chaque paie</p>`;
-  else need = `<p class="need" style="color:var(--ink-soft)">Sans échéance · il reste ${eur(st.remaining)}</p>`;
-  const color = st.reached ? '' : st.overdue ? 'low' : 'mid';
+  if (st.perPaie != null) need = `<p class="need">≈ ${eur(st.perPaie)} à mettre de côté à chaque paie <span class="muted" style="font-weight:400">(reste à prévoir ${eur(st.remaining)})</span></p>`;
+  else if (st.remaining > 0) need = `<p class="need" style="color:var(--ink-soft)">Reste à prévoir : ${eur(st.remaining)}</p>`;
+  else if (st.over > 0) need = `<p class="need" style="color:var(--ink-soft)">Coût réel au-dessus de l'objectif de ${eur(st.over)}</p>`;
+  else need = `<p class="need" style="color:var(--ink-soft)">Tout est prévu</p>`;
   const renew = p.yearly && p.due && p.due < T();
   return `<div class="card goal">
-    <div class="top" data-act="project" data-id="${p.id}"><div><p class="name">${esc(p.name)}${p.yearly ? '<span class="badge ok">chaque année</span>' : ''}</p>
+    <div class="top" data-act="project" data-id="${p.id}"><div><p class="name">${esc(p.name)}${p.yearly ? '<span class="badge">chaque année</span>' : ''}</p>
       <p class="due">${p.due ? 'Pour le ' + labelDayLong(p.due) : 'Sans échéance'}${acc ? ' · ' + esc(acc.name) : ''}</p></div>
-      <div style="text-align:right"><div class="num" style="font-weight:600">${eur(st.saved)}</div><div class="small muted num">sur ${eur(p.target)}</div></div></div>
-    <div class="track"><div class="fill ${color}" style="width:${Math.round(st.pct * 100)}%"></div></div>
+      <div style="text-align:right"><div class="num" style="font-weight:600">${eur(st.cost)}</div><div class="small muted">coût réel · objectif ${eur(p.target)}</div></div></div>
+    <div class="track"><div class="fill mid" style="width:${Math.round(st.pct * 100)}%"></div></div>
+    <div class="env-meta"><span>Dépensé ${eur(st.spent)}${st.upcoming ? ' · à venir ' + eur(st.upcoming) : ''}</span><span>De côté ${eur(st.saved)}</span></div>
     ${need}
-    <div class="btns">${renew ? `<button class="btn btn-primary" data-act="renew" data-id="${p.id}">↻ Renouveler</button>` : ''}<button class="btn btn-secondary" data-act="contrib" data-id="${p.id}">Mettre de côté</button><button class="btn btn-secondary" data-act="useproj" data-id="${p.id}" ${st.saved > 0 ? '' : 'disabled'}>Utiliser</button></div>
+    <div class="btns">${renew ? `<button class="btn btn-primary" data-act="renew" data-id="${p.id}">↻ Renouveler</button>` : ''}<button class="btn btn-secondary" data-act="contrib" data-id="${p.id}">Mettre de côté</button><button class="btn btn-secondary" data-act="useproj" data-id="${p.id}">Ajouter une dépense</button></div>
   </div>`;
 }
 
@@ -637,7 +640,7 @@ function sheetExpense(e) {
     <div class="field"><label>Enveloppe</label><div class="seg" style="margin:0">
       ${['quotidien', 'plaisirs', 'projet'].map(k => `<label><input type="radio" name="envelope" value="${k}" ${data.envelope === k ? 'checked' : ''} ${k === 'projet' && !projects.length ? 'disabled' : ''}> ${envName(k)}</label>`).join('')}</div></div>
     <div class="field ${data.envelope === 'projet' ? '' : 'hide'}" id="projField"><label>Projet</label><select name="projectId">${projects.map(p => `<option value="${p.id}" ${p.id === data.projectId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
-      <p class="hint">La dépense est prise sur l'argent mis de côté pour ce projet, pas sur tes enveloppes.</p></div>
+      <p class="hint">Comptée dans le coût du projet, pas dans tes enveloppes. Pour la payer avec l'argent mis de côté, passe plutôt par le projet → « Ajouter une dépense ».</p></div>
     <div class="field"><label>Détail (facultatif)</label><input name="label" value="${esc(data.label)}" placeholder="Ex : Carrefour, essence…" autocomplete="off"></div>
     ${dateField('date', data.date)}
     ${buttons(isNew ? 'Ajouter' : 'Enregistrer', isNew ? '' : '<button type="button" class="btn btn-danger" data-act="delexpense" data-id="' + e.id + '">Supprimer</button>')}
@@ -841,6 +844,7 @@ function sheetCharge(c) {
     <div class="field"><label>Famille</label><select name="familyId">${data.familyId || data.kind === 'epargne' ? '' : '<option value="">— Choisir —</option>'}<option value="__epargne" ${data.kind === 'epargne' ? 'selected' : ''}>◎ Épargne (virement vers un livret)</option>${familyOptions(data.kind === 'epargne' ? '' : data.familyId)}</select><p class="hint">Sert à l’analyse : abonnements, banque (crédits, assurances, frais), logement… L'épargne n'est pas comptée comme une dépense.</p></div>
     <div class="field hide" id="accField"><label>Livret</label><select name="accountId">${accountOptions(data.accountId)}<option value="__new">+ Nouveau livret…</option></select></div>
     <div class="row2 hide" id="newAccField"><div class="field"><label>Nom du livret</label><input name="newAccName" placeholder="Ex : Livret A"></div><div class="field"><label>Solde actuel</label><input name="newAccBal" inputmode="decimal" placeholder="0,00"></div></div>
+    ${state.projects.some(x => x.status !== 'clos' || x.id === data.projectId) ? `<div class="field" id="projChargeField"><label>Lié à un projet (facultatif)</label><select name="projectId"><option value="">— Aucun —</option>${state.projects.filter(x => x.status !== 'clos' || x.id === data.projectId).map(x => `<option value="${x.id}" ${x.id === data.projectId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><p class="hint">Ses échéances comptent dans le coût réel du projet (ex. billets d'avion en 4 fois).</p></div>` : ''}
     <div class="seg"><label><input type="radio" name="mode" value="mensuel" ${inst || variable ? '' : 'checked'}> Fixe</label><label><input type="radio" name="mode" value="variable" ${variable ? 'checked' : ''}> Variable</label><label><input type="radio" name="mode" value="inst" ${inst ? 'checked' : ''}> En plusieurs fois</label></div>
     <p class="hint small muted hide" id="varHint" style="margin:-6px 0 12px">Pour un montant qui change chaque mois (badge télépéage, électricité…). Indique une estimation ; une fois prélevé, tu saisis le montant réel. Dès que tu as des montants réels, l'estimation devient la moyenne des 3 derniers.</p>
     <div id="mensuel" class="${inst ? 'hide' : ''}">
@@ -900,6 +904,8 @@ function sheetCharge(c) {
     };
     const sync = () => {
       const ep = form.elements.familyId.value === '__epargne';
+      const pc = root.querySelector('#projChargeField');
+      if (pc) pc.classList.toggle('hide', ep);
       const newAcc = ep && (!state.accounts.length || form.elements.accountId.value === '__new');
       root.querySelector('#accField').classList.toggle('hide', !ep || !state.accounts.length);
       root.querySelector('#newAccField').classList.toggle('hide', !newAcc);
@@ -931,7 +937,7 @@ function sheetCharge(c) {
         accountId = A.uid();
         pendingAccount = { id: accountId, name, anchors: [{ date: T(), balance: bal, createdAt: A.stamp() }], createdAt: A.stamp() };
       }
-      const common = { label, kind, day, familyId: kind === 'epargne' ? 'divers' : fv(f, 'familyId'), accountId };
+      const common = { label, kind, day, familyId: kind === 'epargne' ? 'divers' : fv(f, 'familyId'), accountId, projectId: kind === 'epargne' ? null : fv(f, 'projectId') || null };
       const target = c || { id: A.uid(), createdAt: A.stamp(), skips: [], history: [] };
       Object.assign(target, common);
       if (f.elements.mode.value === 'inst') {
@@ -1056,23 +1062,26 @@ function sheetProject(p) {
   const data = p || { name: '', target: null, due: '', yearly: false, accountId: defaultAccountId() };
   const entries = p ? state.projectEntries.filter(e => e.projectId === p.id).sort(M.byDate).reverse() : [];
   const saved = p ? M.projectSaved(state, p.id) : 0;
+  const st = p ? M.projectStatus(state, p, T()) : null;
   const closed = p && p.status === 'clos';
   openSheet(`<form><h2>${isNew ? 'Nouveau projet' : esc(p.name)}</h2>
     <div class="field"><label>Nom</label><input name="name" value="${esc(data.name)}" placeholder="Ex : Cadeaux de Noël"></div>
-    <div class="row2"><div class="field"><label>Montant à atteindre</label><input name="target" inputmode="decimal" value="${amountValue(data.target)}"></div>
+    <div class="row2"><div class="field"><label>Budget prévu (objectif)</label><input name="target" inputmode="decimal" value="${amountValue(data.target)}"></div>
     <div class="field"><label>Pour le (facultatif)</label><input type="date" name="due" value="${data.due || ''}"></div></div>
     <label class="check"><input type="checkbox" name="yearly" ${data.yearly ? 'checked' : ''}> Revient chaque année (anniversaire, Noël, entretien…)</label>
     <div class="field"><label>Argent rangé sur</label><select name="accountId" ${p && entries.length ? 'disabled' : ''}>${accountOptions(data.accountId)}</select></div>
     ${buttons('Enregistrer')}
     ${p ? `<div class="btns" style="margin-top:10px">${closed ? '<button type="button" class="btn btn-secondary" data-act="reopenproj" data-id="' + p.id + '">Réactiver</button>' : '<button type="button" class="btn btn-secondary" data-act="closeproj" data-id="' + p.id + '">Clôturer</button>'}<button type="button" class="btn btn-danger" data-act="delproj" data-id="${p.id}">Supprimer</button></div>
-      <p class="section-title" style="margin:20px 0 6px">Historique · ${eur(saved)} de côté</p>
-      <div class="list">${entries.length ? entries.map(e => `<div class="item" style="cursor:default"><div class="main"><p class="t">${esc(e.note)}</p><p class="s">${labelDay(e.date, true)}</p></div><span class="amt ${e.amount > 0 ? 'pos' : 'neg'}">${signed(e.amount)}</span><button type="button" class="link" data-act="delentry" data-id="${e.id}" aria-label="Supprimer">✕</button></div>`).join('') : '<p class="empty">Rien de mis de côté pour l’instant.</p>'}</div>` : ''}
+      <p class="section-title" style="margin:20px 0 6px">Coût réel · ${eur(st.cost)}</p>
+      <div class="list">${st.items.length ? [...st.items].reverse().map(i => `<div class="item" ${i.type === 'depense' ? `data-act="expense" data-id="${i.ref.id}"` : `data-act="charge" data-id="${i.ref.id}"`}><div class="main"><p class="t">${esc(i.label || 'Dépense')}</p><p class="s">${i.type === 'prelevement' ? 'Prélèvement · ' : ''}${labelDay(i.date, true)}${i.upcoming ? ' · à venir' : ''}</p></div><span class="amt">${i.upcoming ? '≈ ' : ''}${eur(i.amount)}</span></div>`).join('') : '<p class="empty">Aucune dépense pour l’instant.</p>'}</div>
+      <p class="section-title" style="margin:20px 0 6px">Mis de côté · ${eur(saved)}</p>
+      <div class="list">${entries.length ? entries.map(e => `<div class="item" style="cursor:default"><div class="main"><p class="t">${esc(e.note)}</p><p class="s">${labelDay(e.date, true)}</p></div><span class="amt">${signed(e.amount)}</span><button type="button" class="link" data-act="delentry" data-id="${e.id}" aria-label="Supprimer">✕</button></div>`).join('') : '<p class="empty">Rien de mis de côté pour l’instant.</p>'}</div>` : ''}
   </form>`, root => {
     bindForm(root, f => {
       const name = fv(f, 'name');
       const target = parseAmount(fv(f, 'target'));
       need(name, 'Indique un nom.');
-      need(target > 0, 'Indique le montant à atteindre.');
+      need(target > 0, 'Indique le budget prévu.');
       const values = { name, target, due: fv(f, 'due') || null, yearly: f.elements.yearly.checked };
       if (!f.elements.accountId.disabled) values.accountId = fv(f, 'accountId');
       if (p) Object.assign(p, values);
@@ -1096,6 +1105,7 @@ ACTIONS.delproj = id => {
     state.projectEntries = state.projectEntries.filter(e => e.projectId !== id);
     for (const m of state.movements) if (m.projectId === id) m.projectId = null;
     for (const e of state.expenses) if (e.projectId === id) { e.projectId = null; e.envelope = 'plaisirs'; }
+    for (const c of state.charges) if (c.projectId === id) c.projectId = null;
   });
 };
 ACTIONS.delentry = id => {
@@ -1111,7 +1121,7 @@ function sheetContrib(p) {
   const st = M.projectStatus(state, p, T());
   const acc = accById(p.accountId);
   openSheet(`<form><h2>Mettre de côté · ${esc(p.name)}</h2>
-    <p class="intro">Déjà ${eur(st.saved)} sur ${eur(p.target)}.</p>
+    <p class="intro">Objectif ${eur(p.target)} : ${eur(st.cost)} déjà dépensés ou prévus, ${eur(st.saved)} de côté. Reste à prévoir : ${eur(st.remaining)}.</p>
     <div class="field amount"><input name="amount" inputmode="decimal" value="${amountValue(st.perPaie || (st.remaining || null))}" aria-label="Montant"></div>
     <div class="seg"><label><input type="radio" name="how" value="virement" checked> Je fais le virement</label><label><input type="radio" name="how" value="affecter"> Déjà sur le livret</label></div>
     <p class="hint small muted" style="margin:-6px 0 14px">« Je fais le virement » : l'argent passe de ton compte à ${esc(acc ? acc.name : 'ton livret')}. « Déjà sur le livret » : tu réserves de l'argent qui y est déjà.</p>
@@ -1136,23 +1146,24 @@ function sheetUseProject(p) {
   const saved = M.projectSaved(state, p.id);
   const cats = state.categories;
   const defCat = (cats.find(c => c.id === 'cadeaux') || cats[0]).id;
-  openSheet(`<form><h2>Utiliser · ${esc(p.name)}</h2>
-    <p class="intro">${eur(saved)} de côté pour ce projet.</p>
-    <div class="field amount"><input name="amount" inputmode="decimal" value="${amountValue(saved)}" aria-label="Montant"></div>
+  openSheet(`<form><h2>Dépense · ${esc(p.name)}</h2>
+    <p class="intro">Elle compte dans le coût du projet, pas dans tes enveloppes.</p>
+    <div class="field amount"><input name="amount" inputmode="decimal" placeholder="0,00 €" aria-label="Montant"></div>
     <div class="field"><label>Pour quoi ?</label><input name="label" placeholder="Ex : cadeau, réparation…"></div>
     <div class="field"><label>Catégorie</label><select name="categoryId">${sortedFamilies().map(f => { const cs = catsOf(f.id); return cs.length ? `<optgroup label="${esc(f.name)}">${cs.map(c => `<option value="${c.id}" ${c.id === defCat ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>` : ''; }).join('')}</select></div>
     ${dateField('date', T())}
-    <label class="check"><input type="checkbox" name="bringBack" checked> Je rapatrie cet argent du livret vers mon compte</label>
-    <label class="check"><input type="checkbox" name="record" checked> Enregistrer la dépense (hors enveloppes Quotidien et Plaisirs)</label>
-    ${buttons('Valider')}</form>`, root => {
+    ${saved > 0 ? `<label class="check"><input type="checkbox" name="fromSaved" checked> Payée avec l'argent mis de côté (${eur(saved)}) : je le rapatrie du livret vers mon compte</label>` : '<p class="small muted">Rien n’est encore de côté pour ce projet : la dépense est payée par ton compte.</p>'}
+    ${buttons('Ajouter')}</form>`, root => {
     bindDateChips(root);
     bindForm(root, f => {
       const amount = parseAmount(fv(f, 'amount'));
       need(amount > 0, 'Indique un montant.');
-      need(amount <= saved, `Il n'y a que ${eur(saved)} de côté.`);
-      A.useProject(state, p, { date: fv(f, 'date') || T(), amount, label: fv(f, 'label'), categoryId: fv(f, 'categoryId'), bringBack: f.elements.bringBack.checked, recordExpense: f.elements.record.checked });
-      closeSheet(); commit(); toast('C’est noté.');
+      const fromSaved = !!(f.elements.fromSaved && f.elements.fromSaved.checked);
+      A.useProject(state, p, { date: fv(f, 'date') || T(), amount, label: fv(f, 'label'), categoryId: fv(f, 'categoryId'), fromSaved, saved });
+      closeSheet(); commit();
+      toast(fromSaved && amount > saved ? `Dépense ajoutée : ${eur(saved)} pris sur l'argent de côté, le reste sur ton compte.` : 'Dépense ajoutée au projet.');
     });
+    setTimeout(() => root.querySelector('[name="amount"]').focus(), 60);
   });
 }
 

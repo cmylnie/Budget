@@ -135,11 +135,39 @@ test('projets : versement sur le livret, réserve, utilisation', () => {
   assert.equal(M.accountBalance(s, '2026-09-29'), 2750);
   // paies restantes avant le 24 déc. : fin oct. et fin nov. (celle de déc. arrive trop tard)
   assert.equal(M.projectStatus(s, proj, '2026-09-29').perPaie, 75);
-  A.useProject(s, proj, { date: '2026-12-10', amount: 50, label: 'Jouets', categoryId: 'cadeaux', bringBack: true, recordExpense: true });
+  A.useProject(s, proj, { date: '2026-12-10', amount: 50, label: 'Jouets', categoryId: 'cadeaux', fromSaved: true, saved: 50 });
   assert.equal(M.projectSaved(s, 'noel'), 0);
+  assert.equal(M.savingsBalance(s, livret.id, '2026-12-10'), 1000 + 50 + 3 * 20 - 50); // + virements auto oct., nov., déc.
+  const st = M.projectStatus(s, proj, '2026-12-10');
+  // payé avec l'argent de côté : le reste à prévoir ne bouge pas (200 − 50 dépensés − 0 de côté)
+  assert.deepEqual([st.cost, st.saved, st.remaining], [50, 0, 150]);
   // l'argent rapatrié puis dépensé ne touche pas l'enveloppe Plaisirs
   const cyc = M.currentCycle(s, '2026-12-10');
   assert.equal(M.envelopeStatus(s, cyc, 'plaisirs').spent, 0);
+});
+
+test('projet : une dépense directe réduit le reste à prévoir, le coût réel peut dépasser l’objectif', () => {
+  const { s, livret } = base();
+  const proj = { id: 'mariage', name: 'Mariage', target: 500, due: '2026-11-08', yearly: false, accountId: livret.id, status: 'actif' };
+  s.projects.push(proj);
+  A.contributeProject(s, proj, { date: '2026-09-29', amount: 100, fromAccount: true });
+  // dépense saisie avec le bouton + (enveloppe Projet) : ne puise pas dans l'argent de côté
+  s.expenses.push({ id: 'x1', date: '2026-10-05', amount: 111.5, label: 'Voiture', categoryId: 'location-voiture', envelope: 'projet', projectId: 'mariage', createdAt: A.stamp() });
+  // billets en 4 fois liés au projet : la 1re échéance (avant le départ du suivi) compte dans le coût
+  s.charges.push({ id: 'avion', label: 'Billets', familyId: 'voyages', kind: 'fixe', day: 15, start: '2026-09', skips: [], history: [], projectId: 'mariage',
+    installment: { total: 669, count: 4, amounts: [188.93, 171.62, 154.22, 154.23] } });
+  let st = M.projectStatus(s, proj, '2026-10-20');
+  assert.equal(st.saved, 100);
+  assert.equal(st.spent, M.r2(111.5 + 188.93 + 171.62));
+  assert.equal(st.upcoming, M.r2(154.22 + 154.23)); // échéances de nov. et déc., même après l'événement
+  assert.equal(st.cost, M.r2(111.5 + 669));
+  assert.equal(st.remaining, 0);
+  assert.equal(st.over, M.r2(111.5 + 669 - 500)); // simple constat
+  // sans les billets : 500 − 111,50 dépensés − 100 de côté = 288,50 à prévoir
+  s.charges = [];
+  st = M.projectStatus(s, proj, '2026-10-20');
+  assert.equal(st.remaining, 288.5);
+  assert.equal(M.projectSaved(s, 'mariage'), 100);
 });
 
 test('recalage : le solde de la banque remplace l’estimation', () => {

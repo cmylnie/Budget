@@ -29,8 +29,10 @@ Adresse de l'appli : **https://cmylnie.github.io/Budget/** (attention au **B** m
   (restos, sorties, shopping, loisirs…). À chaque paie, elles **repartent à zéro** avec leur budget
   habituel ; si tu veux, le reste peut être reporté sur le nouveau cycle ou mis sur un livret (bouton
   « Reporter le reste ? » juste après la paie, ou Journal → cycle précédent → Modifier).
-- **Les projets** (mariage, Noël, voiture…) ont un montant à atteindre ; leur argent est rangé sur un
-  livret. Les dépenses payées avec ne touchent pas les enveloppes.
+- **Les projets** (mariage, Noël, voiture…) ont un budget prévu. Tout ce qui est dépensé pour le projet
+  (dépenses, prélèvements liés comme des billets en 4×) forme son **coût réel** et réduit ce qu'il reste
+  à prévoir ; l'argent mis de côté sur un livret couvre la suite. Dépasser le budget est un simple
+  constat. Les dépenses d'un projet ne touchent pas les enveloppes.
 - **Rien ne réécrit le passé** : un changement de tarif, d'enveloppe ou de salaire s'applique à partir
   d'une date.
 - **Le solde de départ** (ou un recalage) sert de repère : ce qui est daté avant est considéré comme
@@ -68,12 +70,16 @@ location de voiture, visites.
 
 ### Un projet comme un voyage ou un mariage
 
-1. Les paiements à dates fixes (billets en 4×) → un **prélèvement en plusieurs fois**.
-2. Le reste (location de voiture, cadeaux, argent sur place…) → un **projet** sur le livret, avec une
-   date. **Mettre de côté** à chaque paie, puis **Utiliser** au moment de payer.
-3. Pendant le voyage : bouton **+** avec l'enveloppe **Projet**. On peut baisser le budget Quotidien de
-   ce cycle-là.
-4. Au retour : **Clôturer** le projet ; l'argent restant redevient libre sur le livret.
+1. Épargne → Projets → **+ Ajouter** : nom, **budget prévu**, date, livret où ranger l'argent.
+2. Les paiements à dates fixes (billets en 4×) → un **prélèvement**, avec **« Lié à un projet »** : toutes
+   ses échéances comptent dans le coût du projet (même celles d'avant le début du suivi ou d'après
+   l'événement).
+3. **Mettre de côté** à chaque paie ce que l'appli indique (= budget − déjà dépensé ou prévu − déjà de
+   côté, réparti sur les paies d'ici la date).
+4. Chaque dépense pour le projet : sur la carte du projet, **Ajouter une dépense** (case cochée pour la
+   payer avec l'argent de côté, rapatrié du livret), ou bouton **+** avec l'enveloppe **Projet**.
+5. La fiche du projet liste son **coût réel** ligne par ligne et l'argent mis de côté.
+6. Au retour : **Clôturer** le projet ; l'argent restant redevient libre sur le livret.
 
 ## Sauvegarde et changement de téléphone
 

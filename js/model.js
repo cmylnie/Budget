@@ -184,14 +184,40 @@ function paidThisMonth(state, today) {
   return state.paies.some(p => ym(p.date) === ym(today) && p.date <= today);
 }
 
+// Coût réel d'un projet : les dépenses rangées dans ce projet et les prélèvements qui lui sont liés.
+// Un paiement en plusieurs fois compte en entier (même les échéances après l'événement) ; un
+// prélèvement mensuel lié compte jusqu'à l'échéance du projet (ou aujourd'hui s'il n'y en a pas).
+export function projectCost(state, p, today) {
+  const items = state.expenses
+    .filter(e => e.envelope === 'projet' && e.projectId === p.id)
+    .map(e => ({ type: 'depense', date: e.date, amount: e.amount, label: e.label, ref: e }));
+  for (const c of state.charges.filter(x => x.projectId === p.id)) {
+    const end = chargeEndYM(c);
+    const to = end ? dateInMonth(end, 31) : (p.due && p.due > today ? p.due : today);
+    for (const o of chargeOccurrences(state, c.start + '-01', to, x => x.id === c.id)) {
+      items.push({ type: 'prelevement', date: o.date, amount: o.amount, label: c.label, ref: c, upcoming: o.date > today });
+    }
+  }
+  items.sort(byDate);
+  const spent = sum(items.filter(i => !i.upcoming), i => i.amount);
+  const upcoming = sum(items.filter(i => i.upcoming), i => i.amount);
+  return { items, spent, upcoming, total: r2(spent + upcoming) };
+}
+
+// Ce qui est dépensé ou déjà prévu (prélèvements à venir) réduit ce qu'il reste à mettre de côté.
+// Dépasser l'objectif n'est pas une erreur : c'est le coût réel de l'événement.
 export function projectStatus(state, p, today) {
   const saved = projectSaved(state, p.id);
-  const remaining = r2(Math.max(0, p.target - saved));
-  const reached = remaining === 0;
-  const overdue = !reached && !!p.due && p.due < today;
-  let perPaie = null;
-  if (!reached && p.due && !overdue) perPaie = r2(remaining / paiesUntil(state, today, p.due));
-  return { saved, remaining, reached, overdue, perPaie, pct: p.target > 0 ? Math.min(1, saved / p.target) : 0 };
+  const cost = projectCost(state, p, today);
+  const remaining = r2(Math.max(0, p.target - cost.total - saved));
+  const past = !!p.due && p.due < today;
+  const perPaie = remaining > 0 && p.due && !past ? r2(remaining / paiesUntil(state, today, p.due)) : null;
+  return {
+    saved, spent: cost.spent, upcoming: cost.upcoming, cost: cost.total, items: cost.items,
+    remaining, funded: remaining === 0, past, perPaie,
+    over: r2(Math.max(0, cost.total - p.target)),
+    pct: p.target > 0 ? Math.min(1, (cost.total + saved) / p.target) : 0,
+  };
 }
 
 /* ---------- Paies et cycles ---------- */

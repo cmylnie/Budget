@@ -151,44 +151,32 @@ export function contributeProject(state, project, { date, amount, fromAccount })
   state.projectEntries.push({ id: uid(), projectId: project.id, date, amount, note: fromAccount ? 'Versement' : 'Affecté depuis le livret', movementId, expenseId: null, createdAt: stamp() });
 }
 
-// Utiliser l'argent d'un projet : on le retire du projet, on le rapatrie éventuellement sur le compte
-// et on enregistre la dépense (hors enveloppes Quotidien/Plaisirs).
-export function useProject(state, project, { date, amount, label, categoryId, bringBack, recordExpense }) {
-  let movementId = null;
-  if (bringBack) {
-    const mv = { id: uid(), date, accountId: project.accountId, direction: 'depuis', amount, label: project.name, projectId: project.id, kind: 'projet', createdAt: stamp() };
+// Dépense pour un projet : elle compte dans le coût du projet (hors enveloppes Quotidien/Plaisirs).
+// fromSaved : on la paie avec l'argent mis de côté, rapatrié du livret vers le compte (au plus ce qui
+// est de côté). L'argent mis de côté baisse alors d'autant ; sinon il reste réservé pour la suite.
+export function useProject(state, project, { date, amount, label, categoryId, fromSaved, saved = 0 }) {
+  const e = { id: uid(), date, amount, label: label || project.name, categoryId, envelope: 'projet', projectId: project.id, createdAt: stamp() };
+  state.expenses.push(e);
+  const taken = fromSaved ? r2(Math.min(amount, saved)) : 0;
+  if (taken > 0) {
+    const mv = { id: uid(), date, accountId: project.accountId, direction: 'depuis', amount: taken, label: project.name, projectId: project.id, kind: 'projet', createdAt: stamp() };
     state.movements.push(mv);
-    movementId = mv.id;
+    state.projectEntries.push({ id: uid(), projectId: project.id, date, amount: -taken, note: label || 'Pris sur l’argent de côté', movementId: mv.id, expenseId: e.id, createdAt: stamp() });
   }
-  let expenseId = null;
-  if (recordExpense) {
-    const e = { id: uid(), date, amount, label: label || project.name, categoryId, envelope: 'projet', projectId: project.id, createdAt: stamp() };
-    state.expenses.push(e);
-    expenseId = e.id;
-  }
-  state.projectEntries.push({ id: uid(), projectId: project.id, date, amount: -amount, note: label || 'Utilisé', movementId, expenseId, createdAt: stamp() });
 }
 
-// Une dépense rangée dans « Projet » puise dans l'argent du projet : on garde l'écriture du projet
-// (et l'éventuel rapatriement depuis le livret) alignée sur la dépense.
+// Une dépense modifiée garde aligné le rapatriement qui l'a payée (s'il y en a un). Une dépense
+// rangée dans « Projet » ne touche jamais d'elle-même l'argent mis de côté.
 export function syncProjectExpense(state, expense) {
   const entry = state.projectEntries.find(x => x.expenseId === expense.id);
-  if (expense.envelope !== 'projet' || !expense.projectId) {
-    if (entry) deleteProjectEntry(state, entry.id, { keepExpense: true });
+  if (!entry) return;
+  if (expense.envelope !== 'projet' || expense.projectId !== entry.projectId) {
+    entry.expenseId = null; // le virement depuis le livret a bien eu lieu : on le garde
     return;
   }
-  if (entry && entry.projectId !== expense.projectId) {
-    deleteProjectEntry(state, entry.id, { keepExpense: true });
-    return syncProjectExpense(state, expense);
-  }
-  if (entry) {
-    entry.amount = -expense.amount;
-    entry.date = expense.date;
-    const mv = entry.movementId && state.movements.find(m => m.id === entry.movementId);
-    if (mv) { mv.amount = expense.amount; mv.date = expense.date; }
-  } else {
-    state.projectEntries.push({ id: uid(), projectId: expense.projectId, date: expense.date, amount: -expense.amount, note: expense.label || 'Dépense', movementId: null, expenseId: expense.id, createdAt: stamp() });
-  }
+  entry.date = expense.date;
+  const mv = entry.movementId && state.movements.find(m => m.id === entry.movementId);
+  if (mv) mv.date = expense.date;
 }
 
 export function deleteExpense(state, expenseId) {

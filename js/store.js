@@ -76,6 +76,9 @@ function addNewDefaults(s) {
       }
     }
   }
+  // v6 : une dépense rangée dans un projet compte dans son coût au lieu de réduire l'argent mis de côté.
+  // Les écritures qui la retiraient de l'argent de côté sans virement réel sont supprimées.
+  if (from < 6) s.projectEntries = s.projectEntries.filter(e => !(e.expenseId && !e.movementId));
   // Nouvelles catégories, après les fusions de familles ci-dessus. Une catégorie déjà créée à la main
   // sous un nom voisin (« Crédits » pour « Crédit », « Frais bancaire »…) n'est pas ajoutée une 2ᵉ fois.
   const key = n => n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, '').replace(/s/g, '');
