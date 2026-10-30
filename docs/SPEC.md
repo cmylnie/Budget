@@ -2,7 +2,7 @@
 
 Refonte complète de la v1 (fichier HTML unique ouvert depuis le gestionnaire de fichiers, données
 perdues à chaque nouvelle version). Ce document décrit le modèle et les règles ; le code fait foi.
-Version de l'appli : `APP_VERSION` dans `js/app.js` (2.8.0 à la date de ce document).
+Version de l'appli : `APP_VERSION` dans `js/app.js` (2.9.0 à la date de ce document).
 
 ## 1. Architecture
 
@@ -40,6 +40,7 @@ dans le temps est **datée** : modifier quelque chose n'affecte jamais le passé
 | `settings.envelopeHistory` | `[{from:'YYYY-MM-DD', quotidien, plaisirs}]` budget habituel par cycle |
 | `settings.paydayEstimateDay` | Jour estimé de la paie : **30** (paie entre le 25 et le 30, on prend le plus tard) |
 | `settings.defaultsVersion` | Version des valeurs par défaut déjà appliquées (voir §4) |
+| `settings.reportEmail` | Adresse proposée pour envoyer le bilan de cycle (saisie dans l'appli) |
 | `settings.lastBackupAt` | Horodatage de la dernière sauvegarde (rappel au-delà de 30 jours) |
 | `anchors` | Recalages du compte courant `{date, balance, createdAt}` |
 | `paies` | Paies réellement reçues `{date, amount, note}` : chacune ouvre un cycle |
@@ -52,7 +53,7 @@ dans le temps est **datée** : modifier quelque chose n'affecte jamais le passé
 | `movements` | Virements compte ↔ livret `{direction:'vers'|'depuis', accountId, amount, projectId, kind}` |
 | `projects` | Projets `{name, target, due, yearly, accountId, status}` |
 | `projectEntries` | Écritures des projets (+ mis de côté / − utilisé), liées éventuellement à un mouvement et à une dépense |
-| `cycles[paieId]` | `budget` (budget d'un cycle précis) et `closure` (sort du reste de chaque enveloppe) |
+| `cycles[paieId]` | `budget` (budget d'un cycle précis), `closure` (sort du reste de chaque enveloppe), `bilanSentAt` (bilan envoyé) |
 
 ### Prélèvements (`charges`)
 
@@ -107,6 +108,15 @@ stockée en `kind: 'epargne'` et n'entre pas dans l'analyse des dépenses.
 - **Affichage** : familles par ordre alphabétique (`Divers` en dernier), catégories triées dans chaque
   famille. L'ordre stocké n'a pas d'importance.
 
+### Bilan de cycle (`cycleReport`)
+
+Pour un cycle (terminé ou en cours) : entrées (paies + revenus), prélèvements (hors épargne), dépenses
+par enveloppe, épargne nette (virements automatiques + mouvements vers − depuis les livrets),
+**résultat** = entrées − prélèvements − dépenses − épargne (ce que le compte courant a gagné ou perdu),
+état des enveloppes, dépenses par famille (prélèvements compris) et **familles en hausse** : au moins
++20 € et +20 % par rapport à la moyenne des 3 cycles précédents (3 au plus). L'interface en tire un texte
+envoyé par `mailto:` ou Web Share (pas de serveur, donc pas d'envoi automatique).
+
 ## 4. Migrations des données existantes
 
 `store.normalize()` complète tout état lu ou restauré. Les valeurs par défaut ajoutées après coup sont
@@ -120,6 +130,7 @@ appliquées **une seule fois** grâce à `settings.defaultsVersion` (`DEFAULTS_V
 | 4 | *Crédits* renommée *Banque* (si pas déjà renommée) ; *Assurances* fusionnée dans Banque (prélèvements et catégories déplacés) ; catégories Crédit, Frais bancaires, Assurances (sauf si une catégorie au nom voisin existe déjà dans la famille) |
 | 5 | Enveloppes à zéro à chaque paie : les reports enregistrés (validés quand le report était proposé par défaut) passent à « remettre à zéro » |
 | 6 | Projets : les écritures qui retiraient une dépense de l'argent mis de côté sans virement réel sont supprimées (la dépense compte désormais dans le coût réel) |
+| 7 | Catégorie *Cantine* (Alimentation, Quotidien), sauf si une catégorie au nom voisin existe déjà |
 
 Pour une nouvelle migration : incrémenter `DEFAULTS_VERSION`, marquer les nouveaux éléments par défaut
 avec `since`, ajouter le traitement dans `addNewDefaults()` et un test dans `tests/store.test.js`.

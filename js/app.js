@@ -3,7 +3,7 @@ import * as A from './actions.js';
 import * as S from './store.js';
 import { todayISO, ym, addDays, addMonthsYM, labelDay, labelDayLong, labelMonth, MOIS, MOIS_COURT, daysInMonth } from './dates.js';
 
-const APP_VERSION = '2.8.0';
+const APP_VERSION = '2.9.0';
 
 let state = S.load();
 let view = 'accueil';
@@ -191,6 +191,10 @@ function viewAccueil() {
   if (toConfirm) {
     h += `<div class="banner info"><span>${esc(toConfirm.charge.label)} a été prélevé le ${labelDay(toConfirm.date)} : indique le montant réel (estimé à ${eur(toConfirm.amount)}).</span><button class="btn btn-secondary" data-act="chgreal" data-id="${toConfirm.charge.id}" data-m="${toConfirm.month}">Saisir</button></div>`;
   }
+  const lastClosed = M.cycles(state)[d.cycle.index - 1];
+  if (lastClosed && !(state.cycles[lastClosed.id] || {}).bilanSentAt) {
+    h += `<div class="banner info"><span>📊 Le bilan du cycle précédent est prêt : garde-le par e-mail.</span><button class="btn btn-secondary" data-act="bilan" data-id="${lastClosed.id}">Voir</button></div>`;
+  }
   if (needsBackupReminder()) {
     h += `<div class="banner info"><span>💾 Pense à sauvegarder tes données (utile en cas de changement de téléphone).</span><button class="btn btn-secondary" data-act="backup">Sauvegarder</button></div>`;
   }
@@ -334,8 +338,73 @@ function closureSummary(c) {
     return `<div class="row"><span>${envName(env)} : <b class="${left < 0 ? 'neg' : ''}">${signed(left)}</b></span><span class="muted">${act}</span></div>`;
   }).join('');
   return `<div class="section" style="margin-top:10px"><div class="card summary" style="margin:0">
-    <div class="row"><b style="font-family:inherit">Reste en fin de cycle</b><button class="link" data-act="closure" data-id="${c.id}">Modifier</button></div>${parts}</div></div>`;
+    <div class="row"><b style="font-family:inherit">Reste en fin de cycle</b><button class="link" data-act="closure" data-id="${c.id}">Modifier</button></div>${parts}
+    <div class="row"><span>Bilan du cycle${(state.cycles[c.id] || {}).bilanSentAt ? ' · <span class="muted">envoyé</span>' : ''}</span><button class="link" data-act="bilan" data-id="${c.id}">Voir et envoyer</button></div></div></div>`;
 }
+
+/* ================= Bilan de fin de cycle ================= */
+// Pas de serveur : le bilan est préparé dans l'appli et envoyé par la messagerie du téléphone.
+
+function reportText(r) {
+  const fam = id => (famById(id) || { name: 'Divers' }).name;
+  const L = [];
+  L.push(`Bilan Mes Enveloppes — cycle du ${labelDayLong(r.from)} au ${labelDayLong(r.to)}${r.enCours ? ' (en cours)' : ''}`, '');
+  L.push(`RÉSULTAT : ${signed(r.resultat)}`);
+  L.push(r.resultat < 0 ? `Le compte a perdu ${eur(-r.resultat)} : les sorties ont dépassé les entrées.` : `Le compte a gagné ${eur(r.resultat)} sur ce cycle.`, '');
+  L.push('ENTRÉES', `  Paie : ${eur(r.paies)}`);
+  if (r.revenus) L.push(`  Autres revenus : ${eur(r.revenus)}`);
+  L.push('', 'SORTIES', `  Prélèvements : ${eur(r.prelevements)}`,
+    `  Dépenses : ${eur(r.depensesTotal)} (Quotidien ${eur(r.depenses.quotidien)} · Plaisirs ${eur(r.depenses.plaisirs)} · Projets ${eur(r.depenses.projet)})`,
+    `  Mis sur les livrets : ${eur(r.epargne)}`, '', 'ENVELOPPES');
+  for (const e of r.enveloppes) L.push(`  ${envName(e.env)} : ${eur(e.spent)} dépensés sur ${eur(e.budget)}${e.left < 0 ? ` — dépassé de ${eur(-e.left)}` : ` — reste ${eur(e.left)}`}`);
+  const tot = r.familles.reduce((s, f) => s + f.total, 0);
+  L.push('', 'PAR FAMILLE (prélèvements compris)');
+  for (const f of r.familles) L.push(`  ${fam(f.familyId)} : ${eur(f.total)} (${tot ? Math.round((f.total / tot) * 100) : 0} %)`);
+  const pistes = [];
+  for (const e of r.enveloppes) if (e.left < 0) pistes.push(`Enveloppe ${envName(e.env)} dépassée de ${eur(-e.left)}.`);
+  for (const h of r.hausses) pistes.push(`${fam(h.familyId)} en hausse : ${eur(h.total)} contre ${eur(h.moyenne)} en moyenne (+${eur(h.ecart)}).`);
+  if (r.familles[0]) pistes.push(`Premier poste de dépense : ${fam(r.familles[0].familyId)} (${eur(r.familles[0].total)}).`);
+  if (r.resultat < 0) pistes.push(`Pour revenir à l'équilibre, il faudrait ${eur(-r.resultat)} de moins sur un prochain cycle : à prendre en priorité sur les postes ci-dessus.`);
+  L.push('', "POINTS D'ATTENTION", ...pistes.map(p => '  - ' + p));
+  if (!r.nbCyclesCompares) L.push('  (La comparaison avec les cycles précédents viendra dès le prochain bilan.)');
+  return L.join('\n');
+}
+
+function sheetBilan(c, afterPaie = false) {
+  const r = M.cycleReport(state, c, T());
+  const text = reportText(r);
+  const subject = `Bilan budget — ${labelDay(r.from, true)} au ${labelDay(r.to, true)}`;
+  const email = state.settings.reportEmail || '';
+  const lefts = afterPaie ? A.leftovers(state, c).some(x => x.left > 0) : false;
+  openSheet(`<div><h2>${afterPaie ? 'Paie enregistrée 🎉' : 'Bilan du cycle'}</h2>
+    ${afterPaie ? `<p class="intro">Tes enveloppes repartent à zéro.${lefts ? ' <button class="link" data-act="closure" data-id="' + c.id + '">Reporter le reste ?</button>' : ''}<br>Voici le bilan du cycle qui se termine, à garder par e-mail.</p>` : ''}
+    <div class="card summary" style="margin:0 0 12px">
+      <div class="row"><span>Résultat du cycle</span><b class="${r.resultat < 0 ? 'neg' : 'pos'}">${signed(r.resultat)}</b></div>
+      <div class="row"><span>Entrées</span><b>${eur(r.entrees)}</b></div>
+      <div class="row"><span>Prélèvements + dépenses</span><b>${eur(r.prelevements + r.depensesTotal)}</b></div>
+      <div class="row"><span>Mis sur les livrets</span><b>${eur(r.epargne)}</b></div>
+    </div>
+    <pre class="card" style="white-space:pre-wrap;font:12.5px/1.5 var(--mono);margin:0 0 12px;max-height:38vh;overflow:auto">${esc(text)}</pre>
+    <a class="btn btn-primary" data-act="bilansent" data-id="${c.id}" style="text-decoration:none;margin-bottom:10px" href="mailto:${/^[^\s@<>"]+@[^\s@<>"]+$/.test(email) ? esc(email) : ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}">Envoyer par e-mail${email ? ' à ' + esc(email) : ''}</a>
+    ${navigator.share ? `<button class="btn btn-secondary" data-act="bilanshare" data-id="${c.id}" style="margin-bottom:10px">Partager (Gmail, WhatsApp…)</button>` : ''}
+    ${email ? '' : '<p class="small muted" style="margin:0 0 10px">Astuce : enregistre ton adresse dans ⚙ Réglages → Bilans pour qu’elle soit déjà remplie.</p>'}
+    <div class="btn-row" style="margin-top:4px"><button class="btn btn-secondary" data-act="closesheet">${afterPaie ? 'Plus tard' : 'Fermer'}</button></div></div>`);
+}
+function markBilanSent(id) {
+  (state.cycles[id] || (state.cycles[id] = {})).bilanSentAt = Date.now();
+  S.save(state);
+}
+// le lien mailto s'ouvre normalement ; on note simplement que le bilan est parti
+ACTIONS.bilan = id => sheetBilan(M.cycles(state).find(c => c.id === id));
+ACTIONS.bilansent = (id, el) => { markBilanSent(id); location.href = el.getAttribute('href'); setTimeout(() => { closeSheet(); render(); }, 300); };
+ACTIONS.bilanshare = async id => {
+  const c = M.cycles(state).find(x => x.id === id);
+  const r = M.cycleReport(state, c, T());
+  try {
+    await navigator.share({ title: `Bilan budget — ${labelDay(r.from, true)} au ${labelDay(r.to, true)}`, text: reportText(r) });
+    markBilanSent(id); closeSheet(); render(); toast('Bilan envoyé.');
+  } catch (e) { if (e.name !== 'AbortError') toast('Partage impossible : utilise « Envoyer par e-mail ».'); }
+};
 
 ACTIONS.jprev = () => { const cur = M.currentCycle(state, T()); journalIndex = Math.max(0, (journalIndex ?? cur.index) - 1); render(); };
 ACTIONS.jnext = () => { const cur = M.currentCycle(state, T()); journalIndex = Math.min(M.cycles(state).length - 1, (journalIndex ?? cur.index) + 1); render(); };
@@ -562,6 +631,9 @@ function viewReglages() {
   }
   h += '</div></div>';
 
+  h += `<p class="section-title">Bilans</p><div class="section"><div class="card">
+    <div class="field" style="margin:0"><label>Adresse e-mail pour les bilans</label><input type="email" id="reportEmail" value="${esc(state.settings.reportEmail || '')}" placeholder="ton.adresse@exemple.fr" autocomplete="email">
+    <p class="hint">À chaque paie, l'appli prépare le bilan du cycle qui se termine ; tu l'envoies en un geste. L'adresse reste sur ton téléphone.</p></div></div></div>`;
   h += `<p class="section-title">Sauvegarde</p><div class="section"><div class="card">
     <p style="margin:0 0 10px">Dernière sauvegarde : <b>${last ? labelDayLong(todayISO(new Date(last))) : 'jamais'}</b></p>
     <div class="btns"><button class="btn btn-primary" data-act="backup">Sauvegarder</button><button class="btn btn-secondary" data-act="restore">Restaurer</button></div>
@@ -599,6 +671,7 @@ function mountReglages(root) {
     if (v >= 1 && v <= 31) { state.settings.paydayEstimateDay = v; commit(); toast('Jour de paie enregistré.'); }
   };
   root.querySelector('#restoreFile').onchange = e => restoreFromFile(e.target.files[0]);
+  root.querySelector('#reportEmail').onchange = e => { state.settings.reportEmail = e.target.value.trim(); commit(); toast('Adresse enregistrée.'); };
 }
 
 ACTIONS.extra = id => sheetExtra(id ? state.extras.find(x => x.id === id) : null);
@@ -733,10 +806,10 @@ function sheetPaie(p) {
       const np = A.addPaie(state, { date: d, amount, note: fv(f, 'note') });
       S.save(state);
       const prev = A.previousCycle(state, np.id);
-      closeSheet(); commit();
-      // Les enveloppes repartent à zéro d'elles-mêmes ; reporter le reste reste possible, au choix.
-      if (prev && A.leftovers(state, prev).some(x => x.left > 0)) toast('Paie enregistrée : tes enveloppes repartent à zéro.', () => sheetClosure(prev), 'Reporter le reste ?');
-      else toast('Paie enregistrée : tes enveloppes repartent à zéro.');
+      // Les enveloppes repartent à zéro d'elles-mêmes. On enchaîne sur le bilan du cycle terminé sans
+      // fermer la feuille (la fermer puis en rouvrir une la ferait disparaître aussitôt).
+      if (prev) { commit(); sheetBilan(prev, true); }
+      else { closeSheet(); commit(); toast('Paie enregistrée : tes enveloppes repartent à zéro.'); }
     });
   });
 }

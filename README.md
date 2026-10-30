@@ -52,6 +52,7 @@ Adresse de l'appli : **https://cmylnie.github.io/Budget/** (attention au **B** m
 | Voir mon poste de dépense le plus cher | Onglet **Analyse** (par famille, détail au toucher) |
 | Revoir un cycle passé | Onglet **Journal** (flèches ‹ ›) |
 | Ajouter une famille ou une catégorie | ⚙ Réglages → Catégories de dépenses |
+| Repas à la cantine (sur site) | Catégorie **Cantine** (Alimentation, enveloppe Quotidien) |
 
 ### Prélèvements (onglet Prélèv.)
 
@@ -80,6 +81,18 @@ location de voiture, visites.
    payer avec l'argent de côté, rapatrié du livret), ou bouton **+** avec l'enveloppe **Projet**.
 5. La fiche du projet liste son **coût réel** ligne par ligne et l'argent mis de côté.
 6. Au retour : **Clôturer** le projet ; l'argent restant redevient libre sur le livret.
+
+## Bilan de fin de cycle
+
+Quand tu enregistres ta paie, l'appli affiche le **bilan du cycle qui se termine** : résultat (ce que le
+compte a gagné ou perdu), entrées, prélèvements, dépenses par enveloppe et par famille, et des **points
+d'attention** pour revenir à l'équilibre (enveloppes dépassées, familles en hausse par rapport aux 3
+cycles précédents, montant à économiser si le cycle est négatif).
+
+- **Envoyer par e-mail** ouvre ta messagerie avec le bilan déjà rédigé (adresse à enregistrer dans
+  ⚙ Réglages → Bilans) ; **Partager** l'envoie vers Gmail, WhatsApp…
+- L'appli n'a pas de serveur : elle ne peut pas envoyer le mail toute seule. Tant que le bilan n'est pas
+  envoyé, un rappel reste sur l'accueil. On peut le retrouver à tout moment : Journal → cycle → Bilan.
 
 ## Sauvegarde et changement de téléphone
 

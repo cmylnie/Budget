@@ -353,3 +353,50 @@ export function spendingByFamily(state, from, to, includeCharges) {
   }));
   return list.sort((a, b) => b.total - a.total);
 }
+
+/* ---------- Bilan d'un cycle ---------- */
+// Ce qui est entré, sorti et parti vers les livrets pendant le cycle, l'état des enveloppes, les
+// dépenses par famille et les familles en hausse par rapport aux 3 cycles précédents.
+export function cycleReport(state, cycle, today) {
+  const to = cycle.end || today;
+  const inC = x => x.date >= cycle.start && x.date <= to;
+  const paies = sum(state.paies.filter(inC), p => p.amount);
+  const revenus = sum(state.incomes.filter(inC), i => i.amount);
+  const occ = chargeOccurrences(state, cycle.start, to);
+  const prelevements = sum(occ.filter(o => o.charge.kind !== 'epargne'), o => o.amount);
+  const epargneAuto = sum(occ.filter(o => o.charge.kind === 'epargne'), o => o.amount);
+  const epargneManuelle = sum(state.movements.filter(inC), m => (m.direction === 'vers' ? m.amount : -m.amount));
+  const exps = expensesIn(state, cycle.start, to);
+  const depenses = {
+    quotidien: sum(exps.filter(e => e.envelope === 'quotidien'), e => e.amount),
+    plaisirs: sum(exps.filter(e => e.envelope === 'plaisirs'), e => e.amount),
+    projet: sum(exps.filter(e => e.envelope === 'projet'), e => e.amount),
+  };
+  const depensesTotal = r2(depenses.quotidien + depenses.plaisirs + depenses.projet);
+  const entrees = r2(paies + revenus);
+  const epargne = r2(epargneAuto + epargneManuelle);
+  const familles = spendingByFamily(state, cycle.start, to, true);
+
+  const prev = cycles(state).slice(Math.max(0, cycle.index - 3), cycle.index);
+  const avg = new Map();
+  for (const p of prev) {
+    for (const f of spendingByFamily(state, p.start, p.end, true)) avg.set(f.familyId, (avg.get(f.familyId) || 0) + f.total / prev.length);
+  }
+  const hausses = prev.length
+    ? familles
+      .map(f => ({ familyId: f.familyId, total: f.total, moyenne: r2(avg.get(f.familyId) || 0) }))
+      .map(f => ({ ...f, ecart: r2(f.total - f.moyenne) }))
+      .filter(f => f.ecart >= 20 && f.total > f.moyenne * 1.2)
+      .sort((a, b) => b.ecart - a.ecart)
+      .slice(0, 3)
+    : [];
+
+  return {
+    from: cycle.start, to, enCours: !cycle.end, nbCyclesCompares: prev.length,
+    paies, revenus, entrees, prelevements, depenses, depensesTotal, epargne,
+    // ce que le compte courant a gagné (+) ou perdu (−) pendant le cycle
+    resultat: r2(entrees - prelevements - depensesTotal - epargne),
+    enveloppes: ENVELOPES.map(env => ({ env, ...envelopeStatus(state, cycle, env) })),
+    familles, hausses,
+  };
+}

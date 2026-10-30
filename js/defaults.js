@@ -5,7 +5,7 @@ export const APP_ID = 'mes-enveloppes';
 export const SCHEMA_VERSION = 1;
 // Incrémenté quand on ajoute des familles/catégories par défaut : elles sont alors ajoutées une fois
 // aux données existantes (voir store.normalize), sans recréer celles que l'utilisatrice a supprimées avant.
-export const DEFAULTS_VERSION = 6;
+export const DEFAULTS_VERSION = 7;
 
 export const DEFAULT_FAMILIES = [
   { id: 'alimentation', name: 'Alimentation', icon: '🛒' },
@@ -29,6 +29,7 @@ export const DEFAULT_CATEGORIES = [
   cat('courses', 'Courses', 'alimentation', 'quotidien'),
   cat('boulangerie', 'Boulangerie', 'alimentation', 'quotidien'),
   cat('marche', 'Marché, primeur', 'alimentation', 'quotidien'),
+  cat('cantine', 'Cantine', 'alimentation', 'quotidien', 7), // repas sur site : du quotidien, pas un plaisir
   cat('carburant', 'Carburant', 'transport', 'quotidien'),
   cat('peages', 'Péages', 'transport', 'quotidien'),
   cat('parking', 'Parking', 'transport', 'quotidien'),
@@ -75,6 +76,7 @@ export function emptyState() {
       salaryHistory: [],     // [{from:"YYYY-MM", amount}]
       envelopeHistory: [],   // [{from:"YYYY-MM-DD", quotidien, plaisirs}]
       lastBackupAt: null,
+      reportEmail: '',      // adresse proposée pour envoyer le bilan de chaque cycle
       defaultsVersion: DEFAULTS_VERSION,
     },
     anchors: [],            // recalages du compte courant [{id, date, balance, createdAt}]

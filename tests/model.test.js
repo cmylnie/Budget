@@ -242,3 +242,28 @@ test('paiement en plusieurs fois aux montants inégaux (première échéance dé
   const d = M.dashboard(s, '2026-10-01');
   assert.ok(d.upcoming.some(o => o.charge.id === 'avion' && o.amount === 171.62));
 });
+
+test('bilan de cycle : résultat, enveloppes, familles en hausse', () => {
+  const { s, livret } = base();
+  // cycle 1 (27 sept. → 25 oct.)
+  exp(s, '2026-10-02', 200, 'quotidien', 'courses');
+  exp(s, '2026-10-03', 40, 'plaisirs', 'restaurant');
+  const p2 = A.addPaie(s, { date: '2026-10-26', amount: 2452.04 });
+  // cycle 2 (26 oct. → 26 nov.)
+  exp(s, '2026-10-30', 250, 'quotidien', 'courses');
+  exp(s, '2026-11-02', 150, 'plaisirs', 'restaurant'); // 50 au-dessus du budget Plaisirs
+  s.incomes.push({ id: 'r', date: '2026-11-03', amount: 30, label: 'Remboursement', createdAt: A.stamp() });
+  s.movements.push({ id: 'm', date: '2026-11-04', accountId: livret.id, direction: 'vers', amount: 100, label: '', projectId: null, kind: 'manuel', createdAt: A.stamp() });
+  A.addPaie(s, { date: '2026-11-27', amount: 2452.04 });
+  const c2 = M.cycles(s).find(c => c.id === p2.id);
+  const r = M.cycleReport(s, c2, '2026-11-28');
+  assert.equal(r.to, '2026-11-26');
+  assert.equal(r.entrees, M.r2(2452.04 + 30));
+  assert.equal(r.prelevements, M.r2(15.99 + 343.26));       // box + prêt de novembre
+  assert.equal(r.epargne, 120);                              // 20 automatique + 100 à la main
+  assert.equal(r.depensesTotal, 400);
+  assert.equal(r.resultat, M.r2(2482.04 - 359.25 - 400 - 120));
+  assert.equal(r.enveloppes.find(e => e.env === 'plaisirs').left, -50);
+  // comparé au cycle précédent : Sorties 150 contre 40, Alimentation 250 contre 200 (+25 %)
+  assert.deepEqual(r.hausses.map(h => [h.familyId, h.ecart]), [['sorties', 110], ['alimentation', 50]]);
+});

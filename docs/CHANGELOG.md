@@ -1,5 +1,12 @@
 # Journal des versions
 
+## 2.9.0
+- **Bilan de fin de cycle** affiché à l'enregistrement de la paie : résultat du cycle, entrées,
+  sorties, enveloppes, familles, points d'attention pour revenir à l'équilibre. Envoi par e-mail ou
+  partage en un geste ; rappel sur l'accueil tant qu'il n'est pas envoyé ; retrouvable dans le Journal.
+- Réglages : adresse e-mail pour les bilans.
+- Catégorie **Cantine** ajoutée à la liste de base (Alimentation, enveloppe Quotidien).
+
 ## 2.8.0
 - Projets : le **coût réel** (dépenses et prélèvements liés) réduit ce qu'il reste à prévoir, au lieu
   d'augmenter la somme à mettre de côté. Dépasser le budget prévu est affiché comme un simple constat.

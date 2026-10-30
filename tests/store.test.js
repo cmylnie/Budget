@@ -82,3 +82,12 @@ test('ancienne dépense de projet qui réduisait l’argent de côté : écritur
   ];
   assert.deepEqual(normalize(old).projectEntries.map(e => e.id), ['e1', 'e3']);
 });
+
+test('Cantine ajoutée à la liste de base, sans doublon avec une catégorie créée à la main', () => {
+  const old = emptyState();
+  old.settings.defaultsVersion = 6;
+  old.categories = old.categories.filter(c => c.id !== 'cantine');
+  assert.ok(normalize(JSON.parse(JSON.stringify(old))).categories.some(c => c.id === 'cantine' && c.envelope === 'quotidien'));
+  old.categories.push({ id: 'u9', name: 'Cantine', familyId: 'alimentation', envelope: 'quotidien' });
+  assert.equal(normalize(old).categories.filter(c => /cantine/i.test(c.name)).length, 1);
+});
